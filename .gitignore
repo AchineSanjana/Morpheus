@@ -1,0 +1,167 @@
+# General
+.DS_Store
+Thumbs.db
+desktop.ini
+ehthumbs.db
+Icon?
+
+# Environment files
+.env
+.env.*
+*.local
+local.env
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Node
+node_modules/
+bower_components/
+.pnpm-store/
+package-lock.json#
+# (keep package-lock.json or yarn.lock if you want deterministic installs)
+
+# Build / output
+dist/
+dist-ssr/
+build/
+out/
+public/
+coverage/
+coverage-report/
+report/
+tmp/
+*.map
+
+# Frameworks / tools
+.next/
+.nuxt/
+.gatsby/
+.hugo_cache/
+.svelte-kit/
+.vite/
+.esbuild/
+.cache/
+.parcel-cache/
+.cache-loader/
+
+# Frontend artifacts
+*.class
+*.dll
+*.exe
+*.so
+*.dylib
+*.o
+*.obj
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.python-version
+venv/
+.venv/
+env/
+ENV/
+pip-wheel-metadata/
+*.egg-info/
+.eggs/
+build/
+dist/
+.mypy_cache/
+.pytest_cache/
+.tox/
+.coverage
+coverage.xml
+htmlcov/
+.pyre/
+.pytype/
+ipynb_checkpoints/
+
+# Java / JVM
+target/
+*.jar
+*.war
+*.ear
+*.class
+*.iml
+
+# .NET
+bin/
+obj/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# IDEs and editors
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.iws
+*.iml
+*.ipr
+
+# Editor temp files
+*~ 
+*.swp
+*.swo
+
+# Database
+*.sqlite3
+*.db
+*.db-journal
+*.sql
+*.bak
+
+# Containers / VM
+*.box
+.vagrant/
+Dockerfile.local
+docker-compose.override.yml
+.env.*.local
+
+# Terraform
+.terraform/
+terraform.tfstate
+terraform.tfstate.backup
+.terraform.lock.hcl
+
+# Secrets / keys
+*.pem
+*.key
+*.crt
+
+# Misc
+*.log.*
+*.log
+*.pid
+*.seed
+*.bak
+*.orig
+*.archive
+npm-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.idea/*
+
+# Ignore build artifacts from CI/CD
+artifacts/
+dist-*/
+
+# JetBrains
+.idea/
+*.iml
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
+ehthumbs.db
