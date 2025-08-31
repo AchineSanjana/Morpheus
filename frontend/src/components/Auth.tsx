@@ -2,34 +2,195 @@ import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 
 export function Auth({ onAuthed }:{ onAuthed:()=>void }) {
-  const [email,setEmail]=useState(""); const [password,setPassword]=useState("");
+  const [email,setEmail]=useState(""); 
+  const [password,setPassword]=useState("");
   const [mode,setMode]=useState<"signin"|"signup">("signin");
-  useEffect(()=>{ supabase.auth.getSession().then(({data})=>{
-    if (data.session) onAuthed();
-  }); }, []);
+  const [loading, setLoading] = useState(false);
+  const [status, setStatus] = useState<{type:"idle"|"success"|"error";msg?:string}>({type:"idle"});
+
+  useEffect(()=>{ 
+    supabase.auth.getSession().then(({data})=>{
+      if (data.session) onAuthed();
+    }); 
+  }, [onAuthed]);
+
   async function submit(e:React.FormEvent){
     e.preventDefault();
+    setLoading(true);
+    setStatus({type:"idle"});
+
     if (mode==="signup"){
       const {error}=await supabase.auth.signUp({ email, password });
-      if (error) alert(error.message); else alert("Check your email to confirm.");
+      if (error) {
+        setStatus({type:"error", msg: error.message});
+      } else {
+        setStatus({type:"success", msg: "Check your email to confirm your account!"});
+      }
     } else {
       const {error}=await supabase.auth.signInWithPassword({ email, password });
-      if (error) alert(error.message); else onAuthed();
+      if (error) {
+        setStatus({type:"error", msg: error.message});
+      } else {
+        setStatus({type:"success", msg: "Welcome back!"});
+        onAuthed();
+      }
     }
+    setLoading(false);
   }
+
   return (
-    <div className="max-w-sm mx-auto pt-24">
-      <h1 className="text-2xl font-semibold mb-4">Morpheus</h1>
-      <form onSubmit={submit} className="space-y-3">
-        <input className="w-full bg-zinc-800 p-2 rounded" placeholder="email" value={email} onChange={e=>setEmail(e.target.value)} />
-        <input className="w-full bg-zinc-800 p-2 rounded" type="password" placeholder="password" value={password} onChange={e=>setPassword(e.target.value)} />
-        <button className="w-full bg-indigo-600 hover:bg-indigo-500 p-2 rounded">
-          {mode==="signin" ? "Sign in" : "Sign up"}
-        </button>
-      </form>
-      <button className="text-sm mt-3 underline" onClick={()=>setMode(mode==="signin"?"signup":"signin")}>
-        {mode==="signin" ? "Create an account" : "Have an account? Sign in"}
-      </button>
+    <div className="min-h-screen bg-gradient-to-br from-zinc-900 via-zinc-800 to-zinc-900 flex items-center justify-center p-4">
+      {/* Background decoration */}
+      <div className="absolute inset-0 overflow-hidden">
+        <div className="absolute -top-40 -right-40 w-80 h-80 bg-violet-500/20 rounded-full blur-3xl"></div>
+        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-emerald-500/20 rounded-full blur-3xl"></div>
+      </div>
+
+      <div className="relative w-full max-w-md">
+        {/* Main auth card */}
+        <div className="bg-zinc-900/80 backdrop-blur-xl border border-zinc-700/50 rounded-2xl p-8 shadow-2xl">
+          {/* Header */}
+          <div className="text-center mb-8">
+            <div className="w-16 h-16 bg-gradient-to-br from-violet-500 to-emerald-500 rounded-2xl flex items-center justify-center text-3xl mb-4 mx-auto">
+              💤
+            </div>
+            <h1 className="text-2xl font-bold bg-gradient-to-r from-violet-400 to-emerald-400 bg-clip-text text-transparent">
+              Morpheus
+            </h1>
+            <p className="text-zinc-400 text-sm mt-2">
+              Your AI-powered sleep improvement companion
+            </p>
+          </div>
+
+          {/* Tab switcher */}
+          <div className="flex bg-zinc-800/50 rounded-xl p-1 mb-6">
+            <button
+              type="button"
+              onClick={() => {setMode("signin"); setStatus({type:"idle"});}}
+              className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-all duration-200 ${
+                mode === "signin" 
+                  ? "bg-gradient-to-r from-violet-600 to-emerald-600 text-white shadow-lg" 
+                  : "text-zinc-400 hover:text-zinc-200"
+              }`}
+            >
+              Sign In
+            </button>
+            <button
+              type="button"
+              onClick={() => {setMode("signup"); setStatus({type:"idle"});}}
+              className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-all duration-200 ${
+                mode === "signup" 
+                  ? "bg-gradient-to-r from-violet-600 to-emerald-600 text-white shadow-lg" 
+                  : "text-zinc-400 hover:text-zinc-200"
+              }`}
+            >
+              Sign Up
+            </button>
+          </div>
+
+          {/* Form */}
+          <form onSubmit={submit} className="space-y-6">
+            <div className="space-y-4">
+              <label className="flex flex-col gap-2 text-sm">
+                <span className="font-medium text-zinc-200 flex items-center gap-2">
+                  📧 Email
+                </span>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  className="bg-zinc-800/80 border border-zinc-600/50 p-3 rounded-xl transition-all duration-200 focus:border-violet-400 focus:bg-zinc-800 focus:ring-2 focus:ring-violet-400/20 focus:outline-none"
+                  placeholder="your@email.com"
+                />
+              </label>
+
+              <label className="flex flex-col gap-2 text-sm">
+                <span className="font-medium text-zinc-200 flex items-center gap-2">
+                  🔒 Password
+                </span>
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  minLength={6}
+                  className="bg-zinc-800/80 border border-zinc-600/50 p-3 rounded-xl transition-all duration-200 focus:border-violet-400 focus:bg-zinc-800 focus:ring-2 focus:ring-violet-400/20 focus:outline-none"
+                  placeholder="••••••••"
+                />
+              </label>
+            </div>
+
+            {/* Status messages */}
+            {status.type !== "idle" && (
+              <div className={`flex items-center gap-2 p-3 rounded-xl text-sm ${
+                status.type === "success" 
+                  ? "bg-emerald-500/10 border border-emerald-500/20 text-emerald-400" 
+                  : "bg-rose-500/10 border border-rose-500/20 text-rose-400"
+              }`}>
+                <span>{status.type === "success" ? "✅" : "❌"}</span>
+                <span>{status.msg}</span>
+              </div>
+            )}
+
+            {/* Submit button */}
+            <button
+              disabled={loading || !email || !password}
+              className="w-full bg-gradient-to-r from-violet-600 to-emerald-600 disabled:from-zinc-600 disabled:to-zinc-600 disabled:cursor-not-allowed hover:from-violet-500 hover:to-emerald-500 py-3 rounded-xl text-sm font-medium transition-all duration-200 shadow-lg hover:shadow-xl disabled:shadow-none transform hover:scale-[1.02] disabled:scale-100 flex items-center justify-center gap-2"
+            >
+              {loading ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                  {mode === "signin" ? "Signing in..." : "Creating account..."}
+                </>
+              ) : (
+                <>
+                  {mode === "signin" ? "🚀 Sign In" : "✨ Create Account"}
+                </>
+              )}
+            </button>
+          </form>
+
+          {/* Footer */}
+          <div className="mt-6 pt-6 border-t border-zinc-700/50">
+            <p className="text-xs text-zinc-500 text-center leading-relaxed">
+              {mode === "signin" ? (
+                <>
+                  New to Morpheus?{" "}
+                  <button
+                    type="button"
+                    onClick={() => {setMode("signup"); setStatus({type:"idle"});}}
+                    className="text-emerald-400 hover:text-emerald-300 underline"
+                  >
+                    Create an account
+                  </button>
+                </>
+              ) : (
+                <>
+                  Already have an account?{" "}
+                  <button
+                    type="button"
+                    onClick={() => {setMode("signin"); setStatus({type:"idle"});}}
+                    className="text-violet-400 hover:text-violet-300 underline"
+                  >
+                    Sign in
+                  </button>
+                </>
+              )}
+            </p>
+            <p className="text-xs text-zinc-600 text-center mt-3">
+              By continuing, you agree to our Terms of Service and Privacy Policy
+            </p>
+          </div>
+        </div>
+
+        {/* Bottom tagline */}
+        <div className="text-center mt-6">
+          <p className="text-zinc-500 text-sm">
+            Transform your sleep with AI-powered insights and coaching
+          </p>
+        </div>
+      </div>
     </div>
   );
 }
