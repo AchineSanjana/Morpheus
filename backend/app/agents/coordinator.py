@@ -1,9 +1,10 @@
 # app/agents/coordinator.py
-from typing import Optional
+from typing import Optional, Dict
 from . import BaseAgent, AgentContext, AgentResponse
 from .analyst import AnalyticsAgent
 from .coach import CoachAgent
 from .information import InformationAgent
+from app.llm_gemini import generate_gemini_text  # Import the Gemini helper
 
 WELCOME_MENU = [
     "• Log last night’s sleep",
@@ -14,21 +15,47 @@ WELCOME_MENU = [
 
 class CoordinatorAgent(BaseAgent):
     name = "coordinator"
+    agents: Dict[str, BaseAgent] = {
+        "analytics": AnalyticsAgent(),
+        "coach": CoachAgent(),
+        "information": InformationAgent(),
+    }
 
-    def __init__(self) -> None:
-        self.analyst = AnalyticsAgent()
-        self.coach = CoachAgent()
-        self.info = InformationAgent()
-
-    def _intent(self, msg: str) -> str:
+    def _get_intent_with_keywords(self, msg: str) -> str:
+        """Fallback keyword-based intent detection."""
         t = msg.lower()
         if any(k in t for k in ["analy", "trend", "week", "report", "summary"]):
             return "analytics"
         if any(k in t for k in ["plan", "tips", "improve", "advice", "coach"]):
             return "coach"
-        if any(k in t for k in ["caffeine", "coffee", "screen", "explain", "what is", "define"]):
+        if any(k in t for k in ["caffeine", "coffee", "screen", "explain", "what is", "define", "tell me about"]):
             return "information"
         return "coach"  # default: help them with advice
+
+    async def _get_intent_with_llm(self, message: str) -> Optional[str]:
+        """Use Gemini to determine the user's intent."""
+        prompt = f"""
+        You are an expert at routing user requests to the correct agent.
+        Here are the available agents and their descriptions:
+        - 'analytics': Use for requests about analyzing past sleep data, showing trends, summaries, or reports.
+        - 'coach': Use for requests asking for advice, a sleep plan, tips, or general guidance on how to improve sleep.
+        - 'information': Use for requests asking for factual information, definitions, or explanations about specific sleep-related topics (like caffeine, alcohol, screens, etc.).
+
+        User message: "{message}"
+
+        Based on the user message, which agent should handle this request?
+        Respond with a single word: 'analytics', 'coach', or 'information'.
+        """
+        try:
+            response = await generate_gemini_text(prompt)
+            if response:
+                # Clean up the response to get a single word
+                cleaned_response = response.strip().lower().replace("'", "").replace('"', '').replace(".", "")
+                if cleaned_response in ["analytics", "coach", "information"]:
+                    return cleaned_response
+        except Exception:
+            return None
+        return None
 
     async def handle(self, message: str, ctx: Optional[AgentContext] = None) -> AgentResponse:
         ctx = ctx or {}
@@ -44,10 +71,28 @@ class CoordinatorAgent(BaseAgent):
             )
             return {"agent": self.name, "text": text}
 
-        # Route based on intent
-        intent = self._intent(message)
-        if intent == "analytics":
-            return await self.analyst.handle(message, ctx)
-        if intent == "information":
-            return await self.info.handle(message, ctx)
+        # --- NEW: Intelligent Intent Detection ---
+        # Try to get intent from the LLM first
+        intent = await self._get_intent_with_llm(message)
+        
+        # If LLM fails or returns invalid response, fall back to keyword search
+        if not intent:
+            intent = self._get_intent_with_keywords(message)
+
+        # --- NEW: Context-aware routing for Coach ---
+        # If the intent is 'coach', it might need analysis first.
+        # Let's provide it.
+        if intent == "coach":
+            # Run analysis to get the summary for the coach
+            analysis_response = await self.agents["analytics"].handle(message, ctx)
+            ctx["analysis"] = analysis_response.get("data")
+            return await self.agents["coach"].handle(message, ctx)
+        # --- END NEW ---
+
+        # Route to the determined agent
+        if intent in self.agents:
+            return await self.agents[intent].handle(message, ctx)
+
+        # Fallback if no agent is found
+        return await self.agents["information"].handle(message, ctx)
         return await self.coach.handle(message, ctx)

@@ -3,6 +3,7 @@ from statistics import mean
 from datetime import datetime
 from . import BaseAgent, AgentContext, AgentResponse
 from app.db import fetch_recent_logs
+import math
 
 def _to_dt(x: Any) -> Optional[datetime]:
     if isinstance(x, datetime):
@@ -17,6 +18,57 @@ def _to_dt(x: Any) -> Optional[datetime]:
 def _avg(nums: List[float]) -> Optional[float]:
     nums = [n for n in nums if isinstance(n, (int, float))]
     return round(mean(nums), 2) if nums else None
+
+def _find_correlations(logs: List[Dict[str, Any]]) -> List[str]:
+    """Analyzes logs to find correlations between habits and sleep quality."""
+    insights = []
+    
+    # Add duration_h to logs for correlation analysis
+    for log in logs:
+        bt = _to_dt(log.get("bedtime"))
+        wt = _to_dt(log.get("wake_time"))
+        if bt and wt:
+            log["duration_h"] = (wt - bt).total_seconds() / 3600.0
+        else:
+            log["duration_h"] = None
+
+    # 1. Caffeine analysis
+    caffeine_logs = [log for log in logs if log.get("caffeine_after3pm") and log.get("duration_h") is not None]
+    no_caffeine_logs = [log for log in logs if not log.get("caffeine_after3pm") and log.get("duration_h") is not None]
+
+    if len(caffeine_logs) >= 2 and len(no_caffeine_logs) >= 2:
+        avg_dur_caffeine = _avg([log["duration_h"] for log in caffeine_logs])
+        avg_dur_no_caffeine = _avg([log["duration_h"] for log in no_caffeine_logs])
+        if avg_dur_caffeine is not None and avg_dur_no_caffeine is not None:
+            diff = avg_dur_no_caffeine - avg_dur_caffeine
+            if abs(diff) > 0.25: # Only show if difference is > 15 mins
+                comparison = "more" if diff > 0 else "less"
+                insights.append(f"On days without late caffeine, you slept **{abs(diff):.1f} hours {comparison}** on average.")
+
+    # 2. Alcohol analysis
+    alcohol_logs = [log for log in logs if log.get("alcohol") and log.get("awakenings") is not None]
+    no_alcohol_logs = [log for log in logs if not log.get("alcohol") and log.get("awakenings") is not None]
+    
+    if len(alcohol_logs) >= 1 and len(no_alcohol_logs) >= 2:
+        avg_awakenings_alcohol = _avg([log.get("awakenings", 0) for log in alcohol_logs])
+        avg_awakenings_no_alcohol = _avg([log.get("awakenings", 0) for log in no_alcohol_logs])
+        if avg_awakenings_alcohol is not None and avg_awakenings_no_alcohol is not None:
+            if avg_awakenings_alcohol > avg_awakenings_no_alcohol + 0.5:
+                insights.append(f"You had **more awakenings** on nights you drank alcohol.")
+
+    # 3. Screen time analysis
+    high_screen_logs = [log for log in logs if log.get("screen_time_min", 0) > 60 and log.get("duration_h") is not None]
+    low_screen_logs = [log for log in logs if log.get("screen_time_min", 0) <= 60 and log.get("duration_h") is not None]
+
+    if len(high_screen_logs) >= 2 and len(low_screen_logs) >= 2:
+        avg_dur_high_screen = _avg([log["duration_h"] for log in high_screen_logs])
+        avg_dur_low_screen = _avg([log["duration_h"] for log in low_screen_logs])
+        if avg_dur_high_screen is not None and avg_dur_low_screen is not None:
+            diff = avg_dur_low_screen - avg_dur_high_screen
+            if diff > 0.25:
+                insights.append(f"On nights with less screen time (<60min), you slept **{diff:.1f} hours longer**.")
+
+    return insights
 
 class AnalyticsAgent(BaseAgent):
     """
@@ -61,13 +113,36 @@ class AnalyticsAgent(BaseAgent):
         def _spread_mins(xs: List[datetime]) -> Optional[int]:
             if len(xs) < 2:
                 return None
-            minutes = [x.hour * 60 + x.minute for x in xs]
-            mu = mean(minutes)
-            spread = mean([abs(m - mu) for m in minutes])
-            return round(spread)
+            # Convert time to radians for circular mean calculation
+            minutes_in_day = 24 * 60
+            radians = [(x.hour * 60 + x.minute) / minutes_in_day * 2 * math.pi for x in xs]
+            
+            sin_avg = mean([math.sin(r) for r in radians])
+            cos_avg = mean([math.cos(r) for r in radians])
+            
+            # If all times are the same, r will be 1 and math.log(r) will be 0.
+            # If times are very spread, r will be close to 0, and math.log(r) will be a large negative number.
+            # Add a small epsilon to avoid math domain error if r is slightly > 1.0 due to float precision.
+            r = min(math.sqrt(sin_avg**2 + cos_avg**2), 1.0)
+            if r == 1.0:
+                return 0 # No spread
+
+            std_dev_rad = math.sqrt(-2 * math.log(r))
+            
+            # Convert standard deviation from radians to minutes
+            spread_minutes = (std_dev_rad / (2 * math.pi)) * minutes_in_day
+            return round(spread_minutes)
 
         summary["bedtime_consistency_min"] = _spread_mins(bedtimes)
         summary["wake_consistency_min"] = _spread_mins(waketimes)
+
+        # --- NEW: Find correlations ---
+        correlations = _find_correlations(logs)
+        insights_text = ""
+        if correlations:
+            insights_list = "\n".join(f"• {insight}" for insight in correlations)
+            insights_text = f"\n**Key Insights & Predictions**\n{insights_list}\n"
+        # --- END NEW ---
 
         text = (
             f"**7-day snapshot**\n"
@@ -75,7 +150,8 @@ class AnalyticsAgent(BaseAgent):
             f"• Awakenings ≈ {summary['avg_awakenings']}\n"
             f"• Screen time before bed ≈ {summary['avg_screen_min']} min\n"
             f"• Bedtime consistency ±{summary['bedtime_consistency_min']} min; "
-            f"Wake consistency ±{summary['wake_consistency_min']} min\n\n"
+            f"Wake consistency ±{summary['wake_consistency_min']} min\n"
+            f"{insights_text}"
             f"Ask me: “Why was this week different?” or “Make me a plan.”"
         )
         return {"agent": self.name, "text": text, "data": {"summary": summary, "sample": logs[-3:]}}
