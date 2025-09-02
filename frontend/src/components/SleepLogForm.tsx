@@ -89,11 +89,20 @@ export function SleepLogForm() {
     const now = new Date();
     setWake(now.toISOString().slice(0,16));
   }
-  function setWakePlus(hours:number){
-    if(!bedtime) return;
+  function setWakePlus(hours: number) {
+    if (!bedtime) return;
     const b = new Date(bedtime);
-    const w = new Date(b.getTime()+hours*3600*1000);
-    setWake(w.toISOString().slice(0,16));
+    b.setHours(b.getHours() + hours);
+
+    // Manually format to YYYY-MM-DDTHH:mm to avoid timezone conversion
+    const pad = (num: number) => num.toString().padStart(2, '0');
+    const year = b.getFullYear();
+    const month = pad(b.getMonth() + 1);
+    const day = pad(b.getDate());
+    const h = pad(b.getHours());
+    const m = pad(b.getMinutes());
+    
+    setWake(`${year}-${month}-${day}T${h}:${m}`);
   }
 
   const canSubmit = !!date && !saving; // we allow partial times – analytics code handles nulls

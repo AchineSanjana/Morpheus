@@ -35,7 +35,7 @@ export async function saveSleepLog(payload: SleepLogPayload, token: string) {
   if (!res.ok) throw new Error("sleep log failed");
 }
 
-type Message = {
+export type Message = {
   id: string;
   text: string;
   createdAt: string;

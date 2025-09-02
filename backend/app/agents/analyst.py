@@ -68,6 +68,42 @@ def _find_correlations(logs: List[Dict[str, Any]]) -> List[str]:
             if diff > 0.25:
                 insights.append(f"On nights with less screen time (<60min), you slept **{diff:.1f} hours longer**.")
 
+    # 4. Bedtime consistency analysis
+    bedtimes = [_to_dt(log.get("bedtime")) for log in logs if _to_dt(log.get("bedtime"))]
+    if len(bedtimes) >= 4:
+        # Calculate average bedtime (circular mean)
+        minutes_in_day = 24 * 60
+        radians = [(x.hour * 60 + x.minute) / minutes_in_day * 2 * math.pi for x in bedtimes]
+        sin_avg = mean([math.sin(r) for r in radians])
+        cos_avg = mean([math.cos(r) for r in radians])
+        avg_rad = math.atan2(sin_avg, cos_avg)
+        avg_total_minutes = (avg_rad / (2 * math.pi)) * minutes_in_day
+        if avg_total_minutes < 0: avg_total_minutes += minutes_in_day
+
+        consistent_logs = []
+        inconsistent_logs = []
+        for log in logs:
+            bt = _to_dt(log.get("bedtime"))
+            if not bt or log.get("duration_h") is None: continue
+            
+            log_total_minutes = bt.hour * 60 + bt.minute
+            # Handle overnight wrap-around for comparison
+            diff = abs(log_total_minutes - avg_total_minutes)
+            minute_diff = min(diff, minutes_in_day - diff)
+
+            if minute_diff <= 45: # Within a 45-min window of average
+                consistent_logs.append(log)
+            else:
+                inconsistent_logs.append(log)
+        
+        if len(consistent_logs) >= 2 and len(inconsistent_logs) >= 2:
+            avg_dur_consistent = _avg([log["duration_h"] for log in consistent_logs])
+            avg_dur_inconsistent = _avg([log["duration_h"] for log in inconsistent_logs])
+            if avg_dur_consistent is not None and avg_dur_inconsistent is not None:
+                diff = avg_dur_consistent - avg_dur_inconsistent
+                if diff > 0.25:
+                    insights.append(f"When your bedtime was consistent, you slept **{diff:.1f} hours longer** on average.")
+
     return insights
 
 class AnalyticsAgent(BaseAgent):
