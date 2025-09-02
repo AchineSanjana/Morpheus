@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { supabase } from "./lib/supabaseClient";
+import { supabase, supabaseSession } from "./lib/supabaseClient";
 import { Auth } from "./components/Auth";
 import { SleepLogForm } from "./components/SleepLogForm";
 import { Chat } from "./components/Chat";
@@ -10,21 +10,40 @@ export default function App() {
   const [user, setUser] = useState<any>(null);
 
   useEffect(()=>{
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session)=>{
+    // Subscribe to auth state changes for both clients (localStorage and sessionStorage clients)
+    const { data: { subscription: subA } } = supabase.auth.onAuthStateChange((_e, session)=>{
       setAuthed(!!session);
       setUser(session?.user || null);
     });
-    supabase.auth.getSession().then(({data})=>{
-      setAuthed(!!data.session);
-      setUser(data.session?.user || null);
+    const { data: { subscription: subB } } = supabaseSession.auth.onAuthStateChange((_e, session)=>{
+      setAuthed(!!session);
+      setUser(session?.user || null);
     });
-    return ()=>subscription.unsubscribe();
+
+    // Initialize from either client that has an active session
+    Promise.all([supabase.auth.getSession(), supabaseSession.auth.getSession()])
+      .then(([a, b]) => {
+        if (a?.data?.session) {
+          setAuthed(true);
+          setUser(a.data.session.user || null);
+        } else if (b?.data?.session) {
+          setAuthed(true);
+          setUser(b.data.session.user || null);
+        } else {
+          setAuthed(false);
+          setUser(null);
+        }
+      });
+
+    return ()=>{ subA.unsubscribe(); subB.unsubscribe(); };
   }, []);
 
   async function logout() {
-    await supabase.auth.signOut();
-    setAuthed(false);
-    setUser(null);
+  // sign out both clients to clear sessions regardless of which stored it
+  await supabase.auth.signOut();
+  await supabaseSession.auth.signOut();
+  setAuthed(false);
+  setUser(null);
   }
 
   if (!authed) return <Auth onAuthed={()=>setAuthed(true)} />;

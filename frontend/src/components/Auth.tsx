@@ -1,13 +1,32 @@
 import { useEffect, useState } from "react";
-import { supabase } from "../lib/supabaseClient";
+import { supabase, supabaseSession } from "../lib/supabaseClient";
 
 export function Auth({ onAuthed }:{ onAuthed:()=>void }) {
   const [email,setEmail]=useState(""); 
   const [password,setPassword]=useState("");
-  const [showPassword, setShowPassword] = useState(false);
-  const [mode,setMode]=useState<"signin"|"signup">("signin");
+  const [mode,setMode]=useState<"signin"|"signup"|"reset">("signin");
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState<{type:"idle"|"success"|"error";msg?:string}>({type:"idle"});
+  const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(true);
+
+  // Prefill email from previous "remember" choice
+  useEffect(() => {
+    try {
+      const storedRemember = localStorage.getItem("morpheus:remember");
+      const storedEmail = localStorage.getItem("morpheus:email");
+      if (storedRemember === "1" && storedEmail) {
+        setEmail(storedEmail);
+        setRememberMe(true);
+      } else if (storedEmail) {
+        // if email stored but remember flag absent, set it as not remembered
+        setEmail(storedEmail);
+        setRememberMe(false);
+      }
+    } catch (e) {
+      // ignore storage errors
+    }
+  }, []);
 
   useEffect(()=>{ 
     supabase.auth.getSession().then(({data})=>{
@@ -21,44 +40,47 @@ export function Auth({ onAuthed }:{ onAuthed:()=>void }) {
     setStatus({type:"idle"});
 
     if (mode==="signup"){
-      const {error}=await supabase.auth.signUp({ email, password });
+  const {error}=await supabase.auth.signUp({ email, password });
       if (error) {
         setStatus({type:"error", msg: error.message});
       } else {
         setStatus({type:"success", msg: "Check your email to confirm your account!"});
       }
+  } else if (mode === "reset") {
+      // send password reset email
+      const { error } = await supabase.auth.resetPasswordForEmail(email);
+      if (error) {
+        setStatus({ type: "error", msg: error.message });
+      } else {
+        setStatus({ type: "success", msg: "Check your email for password reset instructions." });
+        // return user to sign-in screen after requesting reset
+        setMode("signin");
+      }
     } else {
-      const {error}=await supabase.auth.signInWithPassword({ email, password });
+      // choose client based on rememberMe. If rememberMe === false, use session-only client.
+      const client = rememberMe ? supabase : supabaseSession;
+      const {error}=await client.auth.signInWithPassword({ email, password });
       if (error) {
         setStatus({type:"error", msg: error.message});
       } else {
+        // persist email if requested (do NOT store password)
+        try {
+          if (rememberMe) {
+            localStorage.setItem("morpheus:email", email);
+            localStorage.setItem("morpheus:remember", "1");
+          } else {
+            // keep email to help with autofill but clear the remember flag
+            localStorage.removeItem("morpheus:remember");
+            // optionally remove email as well to be strict
+            // localStorage.removeItem("morpheus:email");
+          }
+        } catch (e) {}
+
         setStatus({type:"success", msg: "Welcome back!"});
         onAuthed();
       }
     }
     setLoading(false);
-  }
-
-  // Forgot / reset password
-  async function resetPassword() {
-    setStatus({type: "idle"});
-    if (!email) {
-      setStatus({type: "error", msg: "Enter your email address to reset password."});
-      return;
-    }
-    setLoading(true);
-    try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email);
-      if (error) {
-        setStatus({type: "error", msg: error.message});
-      } else {
-        setStatus({type: "success", msg: "Password reset email sent — check your inbox (and spam)."});
-      }
-    } catch (err: any) {
-      setStatus({type: "error", msg: err?.message || "Failed to send reset email."});
-    } finally {
-      setLoading(false);
-    }
   }
 
   return (
@@ -127,53 +149,70 @@ export function Auth({ onAuthed }:{ onAuthed:()=>void }) {
                   placeholder="your@email.com"
                 />
               </label>
-
-              {mode === "signin" && (
-                <div className="text-right mt-2">
-                  <button
-                    type="button"
-                    onClick={resetPassword}
-                    disabled={loading}
-                    className="text-xs text-emerald-400 hover:underline"
-                  >
-                    Forgot password?
-                  </button>
-                </div>
+              {/* Only show password input when not in reset mode */}
+              {mode !== "reset" && (
+                <label className="flex flex-col gap-2 text-sm">
+                  <span className="font-medium text-zinc-200 flex items-center gap-2">
+                    🔒 Password
+                  </span>
+                  <div className="relative">
+                    <input
+                      type={showPassword ? "text" : "password"}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      required
+                      minLength={6}
+                      className="bg-zinc-800/80 border border-zinc-600/50 p-3 rounded-xl transition-all duration-200 focus:border-violet-400 focus:bg-zinc-800 focus:ring-2 focus:ring-violet-400/20 focus:outline-none w-full"
+                      placeholder="••••••••"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(s => !s)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-200 p-1"
+                      aria-label={showPassword ? "Hide password" : "Show password"}
+                    >
+                      {showPassword ? (
+                        // eye-off icon
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-5.523 0-10-4.477-10-10a9.96 9.96 0 012.141-5.8M6.1 6.1A9.956 9.956 0 0112 5c5.523 0 10 4.477 10 10 0 .9-.12 1.77-.35 2.6M3 3l18 18" />
+                        </svg>
+                      ) : (
+                        // eye icon
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.477 0 8.268 2.943 9.542 7-1.274 4.057-5.065 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                          <circle cx="12" cy="12" r="3" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
+                        </svg>
+                      )}
+                    </button>
+                  </div>
+                </label>
               )}
 
-              <label className="flex flex-col gap-2 text-sm">
-                <span className="font-medium text-zinc-200 flex items-center gap-2">
-                  🔑 Password
-                </span>
-                <div className="relative">
-                  <input
-                    type={showPassword ? "text" : "password"}
-                    value={password}
-                    onChange={e=>setPassword(e.target.value)}
-                    required
-                    className="w-full bg-zinc-800/80 border border-zinc-600/50 p-3 pr-12 rounded-xl transition-all duration-200 focus:border-violet-400 focus:bg-zinc-800 focus:ring-2 focus:ring-violet-400/20 focus:outline-none"
-                    placeholder="••••••••"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-0 top-0 h-full px-4 text-zinc-400 hover:text-emerald-400 transition-colors"
-                    aria-label={showPassword ? "Hide password" : "Show password"}
-                  >
-                    {showPassword ? (
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                      </svg>
-                    ) : (
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.542-7 1.274-4.057 5.064 7 9.542 7 .645 0 1.278.066 1.88.188M15 12a3 3 0 11-6 0 3 3 0 016 0zm6 0a9.953 9.953 0 01-1.88 5.812M12 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                      </svg>
-                    )}
-                  </button>
-                </div>
-              </label>
+              {/* (moved) */}
             </div>
+            {/* Inline row: Remember me (left) and Forgot password (right) */}
+            {mode === "signin" && (
+              <div className="flex items-center justify-between mt-2">
+                <label htmlFor="remember" className="flex items-center gap-2 text-sm text-zinc-400">
+                  <input
+                    id="remember"
+                    type="checkbox"
+                    checked={rememberMe}
+                    onChange={(e) => setRememberMe(e.target.checked)}
+                    className="w-4 h-4"
+                  />
+                  <span>Remember me</span>
+                </label>
+
+                <button
+                  type="button"
+                  onClick={() => { setMode("reset"); setStatus({ type: "idle" }); }}
+                  className="text-xs text-emerald-400 hover:text-emerald-300 underline"
+                >
+                  Forgot password?
+                </button>
+              </div>
+            )}
 
             {/* Status messages */}
             {status.type !== "idle" && (
@@ -189,17 +228,17 @@ export function Auth({ onAuthed }:{ onAuthed:()=>void }) {
 
             {/* Submit button */}
             <button
-              disabled={loading || !email || !password}
+              disabled={loading || !email || (mode !== "reset" && !password)}
               className="w-full bg-gradient-to-r from-violet-600 to-emerald-600 disabled:from-zinc-600 disabled:to-zinc-600 disabled:cursor-not-allowed hover:from-violet-500 hover:to-emerald-500 py-3 rounded-xl text-sm font-medium transition-all duration-200 shadow-lg hover:shadow-xl disabled:shadow-none transform hover:scale-[1.02] disabled:scale-100 flex items-center justify-center gap-2"
             >
               {loading ? (
                 <>
                   <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                  {mode === "signin" ? "Signing in..." : "Creating account..."}
+                  {mode === "signin" ? "Signing in..." : mode === "signup" ? "Creating account..." : "Sending..."}
                 </>
               ) : (
                 <>
-                  {mode === "signin" ? "🚀 Sign In" : "✨ Create Account"}
+                  {mode === "signin" ? "🚀 Sign In" : mode === "signup" ? "✨ Create Account" : "✉️ Send reset link"}
                 </>
               )}
             </button>

@@ -62,10 +62,17 @@ export function SleepLogForm() {
 
   const parseDurationH = useCallback(()=>{
     if(!bedtime || !wake) return null;
+    // helper: parse a datetime-local value (YYYY-MM-DDTHH:MM) as local Date
+    const parseLocal = (s:string)=>{
+      const m = s.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
+      if(!m) return new Date(s);
+      const y = +m[1], mo = +m[2]-1, d = +m[3], hh = +m[4], mm = +m[5];
+      return new Date(y,mo,d,hh,mm,0,0);
+    };
     try {
-      const b = new Date(bedtime);
-      let w = new Date(wake);
-      if (w < b) { // crossed midnight / next day
+      const b = parseLocal(bedtime);
+      let w = parseLocal(wake);
+      if (w.getTime() <= b.getTime()) { // crossed midnight / next day
         w = new Date(w.getTime() + 24*60*60*1000);
       }
       const diffH = (w.getTime()-b.getTime())/3.6e6;
@@ -82,27 +89,24 @@ export function SleepLogForm() {
   },[durationH]);
 
   function setNowAsBed() {
-    const now = new Date();
-    setBedtime(now.toISOString().slice(0,16));
+  const now = new Date();
+  const pad=(n:number)=>n.toString().padStart(2,'0');
+  setBedtime(`${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`);
   }
   function setNowAsWake() {
-    const now = new Date();
-    setWake(now.toISOString().slice(0,16));
+  const now = new Date();
+  const pad=(n:number)=>n.toString().padStart(2,'0');
+  setWake(`${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`);
   }
-  function setWakePlus(hours: number) {
-    if (!bedtime) return;
-    const b = new Date(bedtime);
-    b.setHours(b.getHours() + hours);
-
-    // Manually format to YYYY-MM-DDTHH:mm to avoid timezone conversion
-    const pad = (num: number) => num.toString().padStart(2, '0');
-    const year = b.getFullYear();
-    const month = pad(b.getMonth() + 1);
-    const day = pad(b.getDate());
-    const h = pad(b.getHours());
-    const m = pad(b.getMinutes());
-    
-    setWake(`${year}-${month}-${day}T${h}:${m}`);
+  function setWakePlus(hours:number){
+  if(!bedtime) return;
+  const m = bedtime.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
+  if(!m) return;
+  const y=+m[1], mo=+m[2]-1, d=+m[3], hh=+m[4], mm=+m[5];
+  const b = new Date(y,mo,d,hh,mm,0,0);
+  const w = new Date(b.getTime()+hours*3600*1000);
+  const pad=(n:number)=>n.toString().padStart(2,'0');
+  setWake(`${w.getFullYear()}-${pad(w.getMonth()+1)}-${pad(w.getDate())}T${pad(w.getHours())}:${pad(w.getMinutes())}`);
   }
 
   const canSubmit = !!date && !saving; // we allow partial times – analytics code handles nulls

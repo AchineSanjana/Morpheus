@@ -1,5 +1,5 @@
 # app/agents/coordinator.py
-from typing import Optional, Dict
+from typing import Optional
 from . import BaseAgent, AgentContext, AgentResponse
 from .analyst import AnalyticsAgent
 from .coach import CoachAgent
@@ -15,13 +15,13 @@ WELCOME_MENU = [
 
 class CoordinatorAgent(BaseAgent):
     name = "coordinator"
-    agents: Dict[str, BaseAgent] = {
-        "analytics": AnalyticsAgent(),
-        "coach": CoachAgent(),
-        "information": InformationAgent(),
-    }
 
-    def _get_intent_with_keywords(self, msg: str) -> str:
+    def __init__(self) -> None:
+        self.analyst = AnalyticsAgent()
+        self.coach = CoachAgent()
+        self.info = InformationAgent()
+
+    def _intent_keyword(self, msg: str) -> str:
         """Fallback keyword-based intent detection."""
         t = msg.lower()
         if any(k in t for k in ["analy", "trend", "week", "report", "summary"]):
@@ -77,22 +77,25 @@ class CoordinatorAgent(BaseAgent):
         
         # If LLM fails or returns invalid response, fall back to keyword search
         if not intent:
-            intent = self._get_intent_with_keywords(message)
-
-        # --- NEW: Context-aware routing for Coach ---
-        # If the intent is 'coach', it might need analysis first.
-        # Let's provide it.
-        if intent == "coach":
-            # Run analysis to get the summary for the coach
-            analysis_response = await self.agents["analytics"].handle(message, ctx)
-            ctx["analysis"] = analysis_response.get("data")
-            return await self.agents["coach"].handle(message, ctx)
+            intent = self._intent_keyword(message)
         # --- END NEW ---
 
-        # Route to the determined agent
-        if intent in self.agents:
-            return await self.agents[intent].handle(message, ctx)
+        # --- MODIFIED: Route based on the determined intent ---
+        # If the user wants coaching or analysis, we need to run the analysis first.
+        if intent in ["analytics", "coach"]:
+            analysis_result = await self.analyst.handle(message, ctx)
+            
+            # If the intent was just analysis, return the result directly.
+            if intent == "analytics":
+                return analysis_result
+            
+            # If the intent was coaching, add the analysis to the context and proceed.
+            if "data" in analysis_result:
+                ctx["analysis"] = analysis_result["data"]
+            return await self.coach.handle(message, ctx)
 
-        # Fallback if no agent is found
-        return await self.agents["information"].handle(message, ctx)
+        if intent == "information":
+            return await self.info.handle(message, ctx)
+        
+        # Default to the coach agent if unsure
         return await self.coach.handle(message, ctx)

@@ -1,6 +1,7 @@
 from typing import Optional
 from . import BaseAgent, AgentContext, AgentResponse
 from app.llm_gemini import generate_gemini_text
+from app.schemas import InfoResponse, AgentResponseModel
 
 class InformationAgent(BaseAgent):
     """
@@ -26,5 +27,8 @@ class InformationAgent(BaseAgent):
         if not response_text:
             response_text = "I'm sorry, I couldn't retrieve information on that topic at the moment. Please try asking in a different way."
 
-        return {"agent": self.name, "text": response_text, "data": {"topic": "general_inquiry"}}
+        # Validate response
+        info = InfoResponse(topic="general_inquiry", text=response_text)
+        resp = AgentResponseModel(agent=self.name, text=info.text, data={"topic": info.topic})
+        return resp.dict()
 
