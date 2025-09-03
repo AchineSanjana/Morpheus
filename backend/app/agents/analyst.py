@@ -3,6 +3,7 @@ from statistics import mean
 from datetime import datetime
 from . import BaseAgent, AgentContext, AgentResponse
 from app.db import fetch_recent_logs
+import math
 
 def _to_dt(x: Any) -> Optional[datetime]:
     if isinstance(x, datetime):
@@ -61,10 +62,25 @@ class AnalyticsAgent(BaseAgent):
         def _spread_mins(xs: List[datetime]) -> Optional[int]:
             if len(xs) < 2:
                 return None
-            minutes = [x.hour * 60 + x.minute for x in xs]
-            mu = mean(minutes)
-            spread = mean([abs(m - mu) for m in minutes])
-            return round(spread)
+            # Convert time to radians for circular mean calculation
+            minutes_in_day = 24 * 60
+            radians = [(x.hour * 60 + x.minute) / minutes_in_day * 2 * math.pi for x in xs]
+            
+            sin_avg = mean([math.sin(r) for r in radians])
+            cos_avg = mean([math.cos(r) for r in radians])
+            
+            # If all times are the same, r will be 1 and math.log(r) will be 0.
+            # If times are very spread, r will be close to 0, and math.log(r) will be a large negative number.
+            # Add a small epsilon to avoid math domain error if r is slightly > 1.0 due to float precision.
+            r = min(math.sqrt(sin_avg**2 + cos_avg**2), 1.0)
+            if r == 1.0:
+                return 0 # No spread
+
+            std_dev_rad = math.sqrt(-2 * math.log(r))
+            
+            # Convert standard deviation from radians to minutes
+            spread_minutes = (std_dev_rad / (2 * math.pi)) * minutes_in_day
+            return round(spread_minutes)
 
         summary["bedtime_consistency_min"] = _spread_mins(bedtimes)
         summary["wake_consistency_min"] = _spread_mins(waketimes)

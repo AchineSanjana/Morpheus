@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Optional
 from dotenv import load_dotenv
 import httpx
 from supabase import create_client, Client
+from starlette.concurrency import run_in_threadpool
 
 load_dotenv()
 
@@ -70,7 +71,7 @@ async def insert_sleep_log(user_id: str, payload: Dict[str, Any]) -> None:
         row["wake_time"] = _iso(row["wake_time"])
 
     # NOTE: supabase-py is sync; calling in async is okay for a small project
-    supabase.table(SLEEP_LOGS_TABLE).insert(row).execute()
+    await run_in_threadpool(supabase.table(SLEEP_LOGS_TABLE).insert(row).execute)
 
 async def fetch_recent_logs(user_id: str, days: int = 7) -> List[Dict[str, Any]]:
     """
@@ -79,12 +80,15 @@ async def fetch_recent_logs(user_id: str, days: int = 7) -> List[Dict[str, Any]]
     """
     since = (datetime.utcnow() - timedelta(days=days)).date().isoformat()
 
-    resp = supabase.table(SLEEP_LOGS_TABLE) \
-        .select("*") \
-        .eq("user_id", user_id) \
-        .gte("date", since) \
-        .order("date", desc=False) \
-        .execute()
+    def _fetch():
+        return supabase.table(SLEEP_LOGS_TABLE) \
+            .select("*") \
+            .eq("user_id", user_id) \
+            .gte("date", since) \
+            .order("date", desc=False) \
+            .execute()
+
+    resp = await run_in_threadpool(_fetch)
 
     data: List[Dict[str, Any]] = resp.data or []
 

@@ -1,5 +1,6 @@
 from typing import Optional, Dict, Any
 from . import BaseAgent, AgentContext, AgentResponse
+from app.llm_gemini import generate_gemini_text
 
 DISCLAIMER = (
     "This is educational guidance (not medical care). If you have severe trouble sleeping, "
@@ -51,13 +52,40 @@ class CoachAgent(BaseAgent):
 
     async def handle(self, message: str, ctx: Optional[AgentContext] = None) -> AgentResponse:
         ctx = ctx or {}
-        summary = (ctx.get("analysis") or {}).get("summary") or (ctx.get("summary"))
-        tips = _plan_from_summary(summary) if isinstance(summary, dict) else _plan_from_summary({})
+        summary = (ctx.get("analysis") or {}).get("summary")
+        
+        llm_response = None
+        if summary:
+            # If we have a data summary, ask the LLM to create a full, personalized plan.
+            prompt = f"""
+            You are a friendly, encouraging, and expert sleep coach.
+            A user has asked for a sleep plan. Based on their 7-day sleep summary below, create a personalized and actionable sleep improvement plan.
+
+            Your response should have three parts:
+            1.  **A brief, positive opening (1-2 sentences):** Acknowledge their data and frame the opportunity for improvement positively.
+            2.  **A prioritized action plan (3-5 bullet points):** Identify the most important areas for improvement from the data and provide specific, actionable tips. For each tip, briefly explain *why* it's important based on their data.
+            3.  **A concluding sentence:** Offer encouragement.
+
+            **User's 7-Day Sleep Summary:**
+            - Average Sleep Duration: {summary.get('avg_duration_h', 'N/A')} hours/night
+            - Average Awakenings: {summary.get('avg_awakenings', 'N/A')} per night
+            - Average Screen Time Before Bed: {summary.get('avg_screen_min', 'N/A')} minutes
+            - Bedtime Consistency: ±{summary.get('bedtime_consistency_min', 'N/A')} minutes
+            - Wake Time Consistency: ±{summary.get('wake_consistency_min', 'N/A')} minutes
+
+            Generate the full response now.
+            """
+            llm_response = await generate_gemini_text(prompt)
+
+        # Fallback to the old rule-based plan if the LLM fails or there's no summary
+        if not llm_response:
+            tips = _plan_from_summary(summary if isinstance(summary, dict) else {})
+            plan = "\n".join(f"• {t}" for t in tips)
+            llm_response = f"Here’s a 7-day plan based on your recent logs:\n{plan}"
+
+        final_text = f"{llm_response.strip()}\n\n_{DISCLAIMER}_"
+
         safety = self._flag_safety(message)
-
         if safety:
-            tips.append("**Safety:** your message suggests possible red flags. Please consult a clinician.")
-
-        plan = "\n".join(f"• {t}" for t in tips)
-        text = f"Here’s a 7-day plan:\n{plan}\n\n_{DISCLAIMER}_"
-        return {"agent": self.name, "text": text, "data": {"safety": safety}}
+            final_text += "\n\n**Safety:** Please consult a clinician for red-flag symptoms."
+        return {"agent": self.name, "text": final_text, "data": {"safety": safety}}

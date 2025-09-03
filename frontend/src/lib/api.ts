@@ -13,13 +13,16 @@ export async function streamChat(message: string, token: string, onChunk:(t:stri
     onChunk(dec.decode(value));
   }
 }
-type SleepLogPayload = {
-  // Define the expected fields for the sleep log payload
-  // Example:
-  // date: string;
-  // duration: number;
-  // quality: string;
-  [key: string]: unknown; // Replace or extend with actual fields
+// Mirrors backend/app/schemas.py SleepLogIn
+export type SleepLogPayload = {
+  date: string; // YYYY-MM-DD
+  bedtime: string | null; // ISO datetime or null
+  wake_time: string | null; // ISO datetime or null
+  awakenings: number; // integer >=0
+  caffeine_after3pm: boolean;
+  alcohol: boolean;
+  screen_time_min: number; // minutes 0-? (UI caps at 240)
+  notes: string | null;
 };
 
 export async function saveSleepLog(payload: SleepLogPayload, token: string) {
