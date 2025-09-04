@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Optional, Dict, Any 
+from typing import Optional, Any, Dict
 
 class ChatRequest(BaseModel):
     message: str
@@ -13,12 +13,15 @@ class SleepLogIn(BaseModel):
     alcohol: bool = False
     screen_time_min: int = 0
     notes: Optional[str] = None
-
-#---------------
+ 
 class InfoResponse(BaseModel):
-    message: str
-    details: Optional[Dict[str, Any]] = None
+    """Structured informational response from the information agent."""
+    topic: str
+    text: str
+
 
 class AgentResponseModel(BaseModel):
-    status: str
+    """Standard agent response shape used across agents."""
+    agent: str
+    text: str
     data: Optional[Dict[str, Any]] = None
