@@ -4,6 +4,8 @@ from . import BaseAgent, AgentContext, AgentResponse
 from .analyst import AnalyticsAgent
 from .coach import CoachAgent
 from .information import InformationAgent
+from .nutrition import NutritionAgent #Amath
+from .addiction import AddictionAgent #Amath
 from app.llm_gemini import generate_gemini_text  # Import the Gemini helper
 
 WELCOME_MENU = [
@@ -19,6 +21,8 @@ class CoordinatorAgent(BaseAgent):
     def __init__(self) -> None:
         self.analyst = AnalyticsAgent()
         self.coach = CoachAgent()
+        self.nutrition = NutritionAgent() #Amath
+        self.addiction = AddictionAgent() #Amath
         self.info = InformationAgent()
 
     def _intent_keyword(self, msg: str) -> str:
@@ -30,6 +34,8 @@ class CoordinatorAgent(BaseAgent):
             return "coach"
         if any(k in t for k in ["caffeine", "coffee", "screen", "explain", "what is", "define", "tell me about"]):
             return "information"
+        if any(k in t for k in ["addict", "quit", "craving", "dependence"]):
+            return "addiction" #Amath
         return "coach"  # default: help them with advice
 
     async def _get_intent_with_llm(self, message: str) -> Optional[str]:
@@ -89,6 +95,10 @@ class CoordinatorAgent(BaseAgent):
             if intent == "analytics":
                 return analysis_result
             
+            # If the intent was addiction, route to the addiction agent. - Amath
+            if intent == "addiction":
+                return await self.addiction.handle(message, ctx)
+
             # If the intent was coaching, add the analysis to the context and proceed.
             if "data" in analysis_result:
                 ctx["analysis"] = analysis_result["data"]
