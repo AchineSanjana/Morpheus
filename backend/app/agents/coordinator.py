@@ -34,6 +34,14 @@ class CoordinatorAgent(BaseAgent):
             return "coach"
         if any(k in t for k in ["caffeine", "coffee", "screen", "explain", "what is", "define", "tell me about"]):
             return "information"
+        if any(k in t for k in [
+                "nutrition", "diet", "food", "meal", "eating",
+                "caffeine", "coffee", "tea", "energy drink",
+                "alcohol", "wine", "beer", "drink",
+                "exercise", "workout", "gym", "training",
+                "lifestyle", "habits", "routine"
+                ]):
+            return "nutrition" #Amath
         if any(k in t for k in ["addict", "quit", "craving", "dependence"]):
             return "addiction" #Amath
         return "coach"  # default: help them with advice
