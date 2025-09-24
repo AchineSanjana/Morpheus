@@ -4,7 +4,10 @@ from . import BaseAgent, AgentContext, AgentResponse
 from .analyst import AnalyticsAgent
 from .coach import CoachAgent
 from .information import InformationAgent
-from app.llm_gemini import generate_gemini_text  # Import the Gemini helper
+from .nutrition import NutritionAgent
+from .addiction import AddictionAgent
+from .storyteller import StoryTellerAgent
+from app.llm_gemini import generate_gemini_text, gemini_ready  # Import the Gemini helper
 
 WELCOME_MENU = [
     "• Log last night’s sleep",
@@ -40,7 +43,7 @@ class CoordinatorAgent(BaseAgent):
             return "information"
         return "coach"  # default: help them with advice
 
-    def _intent_llm(self, message: str) -> Optional[str]:
+    async def _intent_llm(self, message: str) -> Optional[str]:
         """
         Ask Gemini to choose among {'analytics','coach','information','storyteller'}.
         Returns a valid label or None on any issue (so we can fall back).
@@ -59,7 +62,7 @@ class CoordinatorAgent(BaseAgent):
         )
 
         try:
-            raw = generate_gemini_text(prompt, model="gemini-1.5-flash") or ""
+            raw = await generate_gemini_text(prompt, model_name="gemini-1.5-flash") or ""
         except Exception:
             return None
 
@@ -91,7 +94,7 @@ class CoordinatorAgent(BaseAgent):
             return {"agent": self.name, "text": text}
 
         # 1) Try LLM for intent; 2) fallback to keywords
-        intent = self._intent_llm(message) or self._intent_keyword(message)
+        intent = await self._intent_llm(message) or self._intent_keyword(message)
 
         # If the user wants coaching or analysis, compute analysis first
         if intent in ("analytics", "coach"):
