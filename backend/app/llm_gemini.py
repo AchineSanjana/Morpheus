@@ -1,11 +1,22 @@
 import os
 from typing import Optional
-import google.generativeai as genai
+try:
+    import google.generativeai as genai
+except Exception:
+    genai = None
 
 # Configure the Gemini client with the API key from the .env file
 api_key = os.getenv("GEMINI_API_KEY")
-if api_key:
-    genai.configure(api_key=api_key)
+if api_key and genai:
+    try:
+        genai.configure(api_key=api_key)
+    except Exception:
+        # ignore configuration errors at import time
+        pass
+
+def gemini_ready() -> bool:
+    """Return True when the Gemini API key is configured and client is usable."""
+    return bool(api_key and genai)
 
 async def generate_gemini_text(prompt: str, model_name: str = "gemini-1.5-flash-latest") -> Optional[str]:
     """

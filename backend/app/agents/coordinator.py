@@ -4,8 +4,6 @@ from . import BaseAgent, AgentContext, AgentResponse
 from .analyst import AnalyticsAgent
 from .coach import CoachAgent
 from .information import InformationAgent
-from .nutrition import NutritionAgent #Amath
-from .addiction import AddictionAgent #Amath
 from app.llm_gemini import generate_gemini_text  # Import the Gemini helper
 
 WELCOME_MENU = [
@@ -13,7 +11,10 @@ WELCOME_MENU = [
     "• Analyze my last 7 days",
     "• Give me a 7-day improvement plan",
     "• What do reputable sources say about caffeine/screens/bedtime?",
+    "• Tell me a bedtime story",
 ]
+
+_ALLOWED = {"analytics", "coach", "information", "storyteller"}
 
 class CoordinatorAgent(BaseAgent):
     name = "coordinator"
@@ -26,59 +27,61 @@ class CoordinatorAgent(BaseAgent):
         self.nutrition = NutritionAgent() #Amath
         self.addiction = AddictionAgent() #Amath
         self.info = InformationAgent()
+        self.story = StoryTellerAgent()
 
     def _intent_keyword(self, msg: str) -> str:
         """Fallback keyword-based intent detection."""
-        t = msg.lower()
-        if any(k in t for k in ["analy", "trend", "week", "report", "summary"]):
+        t = (msg or "").lower()
+        if any(k in t for k in ["analy", "trend", "week", "report", "summary", "insight"]):
             return "analytics"
         if any(k in t for k in ["plan", "tips", "improve", "advice", "coach"]):
             return "coach"
         if any(k in t for k in ["caffeine", "coffee", "screen", "explain", "what is", "define", "tell me about"]):
             return "information"
-        if any(k in t for k in [
-                "nutrition", "diet", "food", "meal", "eating",
-                "caffeine", "coffee", "tea", "energy drink",
-                "alcohol", "wine", "beer", "drink",
-                "exercise", "workout", "gym", "training",
-                "lifestyle", "habits", "routine"
-                ]):
-            return "nutrition" #Amath
-        if any(k in t for k in ["addict", "quit", "craving", "dependence"]):
-            return "addiction" #Amath
         return "coach"  # default: help them with advice
 
-    async def _get_intent_with_llm(self, message: str) -> Optional[str]:
-        """Use Gemini to determine the user's intent."""
-        prompt = f"""
-        You are an expert at routing user requests to the correct agent.
-        Here are the available agents and their descriptions:
-        - 'analytics': Use for requests about analyzing past sleep data, showing trends, summaries, or reports.
-        - 'coach': Use for requests asking for advice, a sleep plan, tips, or general guidance on how to improve sleep.
-        - 'information': Use for requests asking for factual information, definitions, or explanations about specific sleep-related topics (like caffeine, alcohol, screens, etc.).
-
-        User message: "{message}"
-
-        Based on the user message, which agent should handle this request?
-        Respond with a single word: 'analytics', 'coach', or 'information'.
+    def _intent_llm(self, message: str) -> Optional[str]:
         """
+        Ask Gemini to choose among {'analytics','coach','information','storyteller'}.
+        Returns a valid label or None on any issue (so we can fall back).
+        """
+        if not gemini_ready():
+            return None
+
+        prompt = (
+            "You route user sleep questions to one of these agents:\n"
+            "- analytics: analyze past sleep data, trends, summaries, reports\n"
+            "- coach: give advice, plans, tips, how to improve sleep\n"
+            "- information: factual info/definitions about sleep topics (caffeine, alcohol, screens, etc.)\n"
+            "- storyteller: tell a calming, short bedtime story\n\n"
+            f"User message: \"{message}\"\n\n"
+            "Respond with just one word: analytics, coach, information, or storyteller."
+        )
+
         try:
-            response = await generate_gemini_text(prompt)
-            if response:
-                # Clean up the response to get a single word
-                cleaned_response = response.strip().lower().replace("'", "").replace('"', '').replace(".", "")
-                if cleaned_response in ["analytics", "coach", "information"]:
-                    return cleaned_response
+            raw = generate_gemini_text(prompt, model="gemini-1.5-flash") or ""
         except Exception:
             return None
-        return None
+
+        cleaned = (
+            raw.strip()
+               .lower()
+               .replace("'", "")
+               .replace('"', "")
+               .replace(".", "")
+               .split()
+        )
+        if not cleaned:
+            return None
+        choice = cleaned[0]
+        return choice if choice in _ALLOWED else None
 
     async def _handle_core(self, message: str, ctx: Optional[AgentContext] = None) -> AgentResponse:
         ctx = ctx or {}
         user = ctx.get("user")
 
         # Greeting / first message
-        if not message.strip() or message.strip().lower() in {"hi", "hello", "hey"}:
+        if not (message or "").strip() or (message or "").strip().lower() in {"hi", "hello", "hey"}:
             menu = "\n".join(WELCOME_MENU)
             text = (
                 f"Hi{' ' + user.get('email') if user else ''}! I’m your sleep coordinator.\n\n"
@@ -87,28 +90,16 @@ class CoordinatorAgent(BaseAgent):
             )
             return {"agent": self.name, "text": text}
 
-        # --- NEW: Intelligent Intent Detection ---
-        # Try to get intent from the LLM first
-        intent = await self._get_intent_with_llm(message)
-        
-        # If LLM fails or returns invalid response, fall back to keyword search
-        if not intent:
-            intent = self._intent_keyword(message)
-        # --- END NEW ---
+        # 1) Try LLM for intent; 2) fallback to keywords
+        intent = self._intent_llm(message) or self._intent_keyword(message)
 
-        # --- MODIFIED: Route based on the determined intent ---
-        # If the user wants coaching or analysis, we need to run the analysis first.
-        if intent in ["analytics", "coach"]:
+        # If the user wants coaching or analysis, compute analysis first
+        if intent in ("analytics", "coach"):
             analysis_result = await self.analyst.handle(message, ctx)
-            
-            # If the intent was just analysis, return the result directly.
+
             if intent == "analytics":
                 return analysis_result
             
-            # If the intent was addiction, route to the addiction agent. - Amath
-            if intent == "addiction":
-                return await self.addiction.handle(message, ctx)
-
             # If the intent was coaching, add the analysis to the context and proceed.
             if "data" in analysis_result:
                 ctx["analysis"] = analysis_result["data"]
@@ -116,6 +107,9 @@ class CoordinatorAgent(BaseAgent):
 
         if intent == "information":
             return await self.info.handle(message, ctx)
-        
-        # Default to the coach agent if unsure
+
+        if intent == "storyteller":
+            return await self.story.handle(message, ctx)
+
+        # Default safety: coach
         return await self.coach.handle(message, ctx)
