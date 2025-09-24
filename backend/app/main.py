@@ -1,4 +1,6 @@
-﻿# app/main.py
+﻿from dotenv import load_dotenv
+load_dotenv()  # load backend/.env before importing anything that uses env vars
+# app/main.py
 import os, asyncio
 from fastapi import FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
