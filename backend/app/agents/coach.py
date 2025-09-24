@@ -1,91 +1,384 @@
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
+from datetime import datetime, timedelta
 from . import BaseAgent, AgentContext, AgentResponse
 from app.llm_gemini import generate_gemini_text
+from app.db import fetch_recent_logs
 
 DISCLAIMER = (
-    "This is educational guidance (not medical care). If you have severe trouble sleeping, "
-    "loud snoring, breathing pauses, or insomnia >3 months, talk to a clinician."
+    "_This is educational guidance based on sleep science principles, not medical care. "
+    "If you have severe insomnia, sleep apnea, or other serious sleep disorders, please consult a healthcare provider._"
 )
 
-RED_FLAGS = [
-    ("apnea", ["snore", "gasp", "stop breathing"]),
-    ("chronic_insomnia", ["> 3 months", "three months", "3 months"]),
-]
-
-def _plan_from_summary(summary: Dict[str, Any]) -> list[str]:
-    tips: list[str] = []
-    dur = summary.get("avg_duration_h")
-    awak = summary.get("avg_awakenings")
-    screen = summary.get("avg_screen_min")
-    bed_spread = summary.get("bedtime_consistency_min")
-
-    tips.append("Pick a **fixed wake-up time** and stick to it daily (anchor the clock).")
-    tips.append("Start a **60–90 min wind-down** routine (dim lights, paper book, stretch, journal).")
-    tips.append("Keep the bedroom **cool, dark, quiet**; bed for sleep only.")
-
-    if screen and screen > 30:
-        tips.append("Reduce screens in the last hour before bed; if needed, use night-shift + dim.")
-    if dur and dur < 7.0:
-        tips.append("Target **7–9 hours** in bed; shift in 15–30 min steps over a few nights.")
-    if awak and awak >= 2:
-        tips.append("If awake >20 min, do a brief reset in dim light, then return to bed.")
-    if bed_spread and bed_spread > 45:
-        tips.append("Tighten timing: keep bedtime within a **±30–45 min** window for a week.")
-
-    tips.append("Avoid caffeine after **3 pm** and big meals late at night.")
-    tips.append("Get **morning daylight** and some daytime movement (even a 10–20 min walk).")
-    return tips
+# Enhanced safety detection patterns
+SAFETY_PATTERNS = {
+    "sleep_apnea": [
+        r"stop breathing", r"gasping", r"choking", r"snoring loudly", 
+        r"partner says I stop", r"wake up gasping"
+    ],
+    "chronic_insomnia": [
+        r"can't sleep for (weeks|months)", r"insomnia for", r"sleepless for", 
+        r"no sleep for", r"haven't slept in"
+    ],
+    "medical_concerns": [
+        r"chest pain", r"heart racing", r"panic attacks", r"medication", 
+        r"depression", r"anxiety disorder", r"bipolar"
+    ],
+    "urgent_symptoms": [
+        r"hallucinations", r"microsleep", r"falling asleep driving", 
+        r"can't function", r"suicidal"
+    ]
+}
 
 class CoachAgent(BaseAgent):
     """
-    CBT-I style, gentle & actionable. Also adds lightweight safety guardrails.
+    Advanced sleep coaching agent with personalized plans, progressive difficulty,
+    habit tracking, and comprehensive CBT-I inspired techniques.
     """
     name = "coach"
 
-    def _flag_safety(self, message: str) -> list[str]:
-        t = message.lower()
-        hits = []
-        for label, keys in RED_FLAGS:
-            if any(k in t for k in keys):
-                hits.append(label)
-        return hits
+    def __init__(self):
+        super().__init__()
+        self.coaching_frameworks = {
+            "cbt_i": "Cognitive Behavioral Therapy for Insomnia",
+            "sleep_hygiene": "Sleep Environment & Habits Optimization",
+            "circadian": "Circadian Rhythm Regulation",
+            "stress_management": "Stress & Anxiety Reduction for Sleep"
+        }
+
+    async def _analyze_sleep_patterns(self, logs: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Deep analysis of sleep patterns with trends and insights."""
+        if not logs:
+            return {}
+        
+        # Time series analysis
+        durations = []
+        bedtimes = []
+        wake_times = []
+        awakenings = []
+        screen_times = []
+        caffeine_nights = 0
+        alcohol_nights = 0
+        
+        for log in logs:
+            if log.get("duration_h"):
+                durations.append(log["duration_h"])
+            
+            awakenings.append(log.get("awakenings", 0))
+            screen_times.append(log.get("screen_time_min", 0))
+            
+            if log.get("caffeine_after3pm"):
+                caffeine_nights += 1
+            if log.get("alcohol"):
+                alcohol_nights += 1
+            
+            # Parse bedtime for consistency analysis
+            if log.get("bedtime"):
+                try:
+                    bt = datetime.fromisoformat(log["bedtime"])
+                    bedtimes.append(bt.hour * 60 + bt.minute)  # minutes since midnight
+                except:
+                    pass
+                    
+            if log.get("wake_time"):
+                try:
+                    wt = datetime.fromisoformat(log["wake_time"])
+                    wake_times.append(wt.hour * 60 + wt.minute)
+                except:
+                    pass
+
+        # Calculate trends and patterns
+        analysis = {
+            "total_nights": len(logs),
+            "avg_duration": round(sum(durations) / len(durations), 1) if durations else None,
+            "duration_trend": self._calculate_trend(durations[-7:]) if len(durations) >= 3 else "stable",
+            "avg_awakenings": round(sum(awakenings) / len(awakenings), 1),
+            "awakening_trend": self._calculate_trend(awakenings[-7:]) if len(awakenings) >= 3 else "stable",
+            "avg_screen_time": round(sum(screen_times) / len(screen_times), 1),
+            "caffeine_frequency": round(caffeine_nights / len(logs) * 100, 1),
+            "alcohol_frequency": round(alcohol_nights / len(logs) * 100, 1),
+            "bedtime_consistency": self._calculate_consistency(bedtimes),
+            "wake_consistency": self._calculate_consistency(wake_times),
+            "sleep_efficiency": self._calculate_sleep_efficiency(logs),
+            "problem_areas": self._identify_problem_areas(logs)
+        }
+        
+        return analysis
+
+    def _calculate_trend(self, values: List[float]) -> str:
+        """Calculate if values are improving, worsening, or stable."""
+        if len(values) < 3:
+            return "stable"
+        
+        # Simple linear trend
+        first_half = sum(values[:len(values)//2]) / (len(values)//2)
+        second_half = sum(values[len(values)//2:]) / (len(values) - len(values)//2)
+        
+        diff = second_half - first_half
+        if abs(diff) < 0.2:
+            return "stable"
+        elif diff > 0:
+            return "improving"
+        else:
+            return "declining"
+
+    def _calculate_consistency(self, times: List[int]) -> Dict[str, Any]:
+        """Calculate time consistency in minutes."""
+        if len(times) < 2:
+            return {"avg_deviation": 0, "rating": "excellent"}
+        
+        avg_time = sum(times) / len(times)
+        deviations = [abs(t - avg_time) for t in times]
+        avg_deviation = sum(deviations) / len(deviations)
+        
+        if avg_deviation < 30:
+            rating = "excellent"
+        elif avg_deviation < 60:
+            rating = "good"
+        elif avg_deviation < 90:
+            rating = "fair"
+        else:
+            rating = "needs improvement"
+            
+        return {"avg_deviation": round(avg_deviation), "rating": rating}
+
+    def _calculate_sleep_efficiency(self, logs: List[Dict[str, Any]]) -> Optional[float]:
+        """Calculate sleep efficiency percentage."""
+        efficiency_scores = []
+        
+        for log in logs:
+            if log.get("duration_h") and log.get("awakenings") is not None:
+                # Rough efficiency: duration / (duration + awakenings * 15min)
+                sleep_time = log["duration_h"] * 60  # minutes
+                wake_time = log["awakenings"] * 15  # assume 15min per awakening
+                total_time = sleep_time + wake_time
+                
+                if total_time > 0:
+                    efficiency = (sleep_time / total_time) * 100
+                    efficiency_scores.append(efficiency)
+        
+        return round(sum(efficiency_scores) / len(efficiency_scores), 1) if efficiency_scores else None
+
+    def _identify_problem_areas(self, logs: List[Dict[str, Any]]) -> List[str]:
+        """Identify specific problem areas from the data."""
+        problems = []
+        
+        # Duration issues
+        short_sleeps = sum(1 for log in logs if log.get("duration_h", 8) < 6.5)
+        if short_sleeps > len(logs) * 0.4:
+            problems.append("insufficient_sleep_duration")
+        
+        # Fragmented sleep
+        high_awakenings = sum(1 for log in logs if log.get("awakenings", 0) >= 3)
+        if high_awakenings > len(logs) * 0.3:
+            problems.append("fragmented_sleep")
+        
+        # Late caffeine
+        late_caffeine = sum(1 for log in logs if log.get("caffeine_after3pm"))
+        if late_caffeine > len(logs) * 0.5:
+            problems.append("late_caffeine_intake")
+        
+        # Excessive screen time
+        high_screen = sum(1 for log in logs if log.get("screen_time_min", 0) > 60)
+        if high_screen > len(logs) * 0.4:
+            problems.append("excessive_screen_time")
+        
+        # Alcohol impact
+        frequent_alcohol = sum(1 for log in logs if log.get("alcohol"))
+        if frequent_alcohol > len(logs) * 0.4:
+            problems.append("frequent_alcohol_use")
+            
+        return problems
+
+    def _generate_personalized_plan(self, analysis: Dict[str, Any], message: str) -> Dict[str, Any]:
+        """Generate a comprehensive, personalized sleep improvement plan."""
+        plan = {
+            "primary_focus": [],
+            "weekly_goals": [],
+            "daily_habits": [],
+            "troubleshooting": [],
+            "timeline": "2-4 weeks",
+            "success_metrics": []
+        }
+        
+        problems = analysis.get("problem_areas", [])
+        
+        # Prioritize issues based on impact
+        if "insufficient_sleep_duration" in problems:
+            plan["primary_focus"].append({
+                "area": "Sleep Duration",
+                "current": f"{analysis.get('avg_duration', 'Unknown')}h average",
+                "target": "7-9 hours nightly",
+                "strategy": "Gradual bedtime adjustment by 15-30 minutes per week"
+            })
+            
+        if "fragmented_sleep" in problems:
+            plan["primary_focus"].append({
+                "area": "Sleep Continuity", 
+                "current": f"{analysis.get('avg_awakenings', 'Unknown')} awakenings/night",
+                "target": "≤1 awakening per night",
+                "strategy": "Sleep environment optimization and relaxation techniques"
+            })
+            
+        if "late_caffeine_intake" in problems:
+            plan["primary_focus"].append({
+                "area": "Caffeine Management",
+                "current": f"{analysis.get('caffeine_frequency', 0)}% of nights with late caffeine",
+                "target": "0% caffeine after 2pm",
+                "strategy": "Gradual cutoff time advancement"
+            })
+        
+        # Generate weekly progression
+        plan["weekly_goals"] = [
+            "Week 1: Establish consistent wake time (±15 min daily)",
+            "Week 2: Optimize sleep environment (darkness, temperature, noise)",
+            "Week 3: Implement pre-sleep routine (60-90 min wind-down)",
+            "Week 4: Fine-tune timing and troubleshoot remaining issues"
+        ]
+        
+        # Daily habit recommendations
+        consistency = analysis.get("bedtime_consistency", {})
+        if consistency.get("rating") in ["fair", "needs improvement"]:
+            plan["daily_habits"].append("Set phone alarm for bedtime routine start")
+            
+        if analysis.get("avg_screen_time", 0) > 30:
+            plan["daily_habits"].extend([
+                "Enable blue light filters 2 hours before bed",
+                "Create phone-free bedroom policy"
+            ])
+            
+        plan["daily_habits"].extend([
+            "Get 10-30 minutes morning sunlight within 1 hour of waking",
+            "No caffeine after 2pm (or 6 hours before target bedtime)",
+            "Keep bedroom temperature 65-68°F (18-20°C)"
+        ])
+        
+        return plan
+
+    def _detect_safety_concerns(self, message: str) -> List[str]:
+        """Enhanced safety detection with specific concern categories."""
+        import re
+        concerns = []
+        text = message.lower()
+        
+        for category, patterns in SAFETY_PATTERNS.items():
+            if any(re.search(pattern, text) for pattern in patterns):
+                concerns.append(category)
+                
+        return concerns
 
     async def handle(self, message: str, ctx: Optional[AgentContext] = None) -> AgentResponse:
         ctx = ctx or {}
-        summary = (ctx.get("analysis") or {}).get("summary")
+        user = ctx.get("user")
         
-        llm_response = None
-        if summary:
-            # If we have a data summary, ask the LLM to create a full, personalized plan.
+        # Safety screening
+        safety_concerns = self._detect_safety_concerns(message)
+        safety_warnings = []
+        
+        if "urgent_symptoms" in safety_concerns:
+            safety_warnings.append("⚠️ **URGENT**: Please seek immediate medical attention if you're experiencing severe symptoms.")
+        elif "sleep_apnea" in safety_concerns:
+            safety_warnings.append("💡 **Important**: Your symptoms may indicate sleep apnea. Please consult a doctor for proper evaluation.")
+        elif "chronic_insomnia" in safety_concerns:
+            safety_warnings.append("🏥 **Recommendation**: Chronic insomnia lasting months should be evaluated by a sleep specialist.")
+        elif "medical_concerns" in safety_concerns:
+            safety_warnings.append("🩺 **Note**: Sleep issues related to medications or mental health conditions require medical supervision.")
+
+        # Get comprehensive sleep data
+        logs = []
+        if user:
+            logs = ctx.get("logs") or await fetch_recent_logs(user["id"], days=14)  # Extended to 14 days
+        
+        # Perform deep analysis
+        analysis = await self._analyze_sleep_patterns(logs)
+        
+        # Generate personalized coaching response
+        if analysis and logs:
+            # Enhanced LLM prompt with comprehensive context
             prompt = f"""
-            You are a friendly, encouraging, and expert sleep coach.
-            A user has asked for a sleep plan. Based on their 7-day sleep summary below, create a personalized and actionable sleep improvement plan.
-
-            Your response should have three parts:
-            1.  **A brief, positive opening (1-2 sentences):** Acknowledge their data and frame the opportunity for improvement positively.
-            2.  **A prioritized action plan (3-5 bullet points):** Identify the most important areas for improvement from the data and provide specific, actionable tips. For each tip, briefly explain *why* it's important based on their data.
-            3.  **A concluding sentence:** Offer encouragement.
-
-            **User's 7-Day Sleep Summary:**
-            - Average Sleep Duration: {summary.get('avg_duration_h', 'N/A')} hours/night
-            - Average Awakenings: {summary.get('avg_awakenings', 'N/A')} per night
-            - Average Screen Time Before Bed: {summary.get('avg_screen_min', 'N/A')} minutes
-            - Bedtime Consistency: ±{summary.get('bedtime_consistency_min', 'N/A')} minutes
-            - Wake Time Consistency: ±{summary.get('wake_consistency_min', 'N/A')} minutes
-
-            Generate the full response now.
+            You are an expert sleep coach with training in CBT-I (Cognitive Behavioral Therapy for Insomnia) and sleep science.
+            
+            A user is asking for sleep improvement guidance. Based on their comprehensive 14-day sleep analysis, create a detailed, personalized coaching response.
+            
+            **User's Sleep Analysis:**
+            - Total nights logged: {analysis.get('total_nights', 0)}
+            - Average sleep duration: {analysis.get('avg_duration', 'Unknown')} hours (trend: {analysis.get('duration_trend', 'unknown')})
+            - Average nightly awakenings: {analysis.get('avg_awakenings', 'Unknown')} (trend: {analysis.get('awakening_trend', 'unknown')})
+            - Sleep efficiency: {analysis.get('sleep_efficiency', 'Unknown')}%
+            - Bedtime consistency: {analysis.get('bedtime_consistency', {}).get('rating', 'unknown')} (±{analysis.get('bedtime_consistency', {}).get('avg_deviation', 0)} min)
+            - Wake time consistency: {analysis.get('wake_consistency', {}).get('rating', 'unknown')} (±{analysis.get('wake_consistency', {}).get('avg_deviation', 0)} min)
+            - Average screen time before bed: {analysis.get('avg_screen_time', 0)} minutes
+            - Late caffeine frequency: {analysis.get('caffeine_frequency', 0)}% of nights
+            - Alcohol frequency: {analysis.get('alcohol_frequency', 0)}% of nights
+            - Identified problem areas: {', '.join(analysis.get('problem_areas', [])) or 'None detected'}
+            
+            **User's Message:** "{message}"
+            
+            Create a comprehensive coaching response with these sections:
+            
+            1. **Personal Assessment (2-3 sentences):** Acknowledge their current sleep patterns and highlight both strengths and improvement areas from their data.
+            
+            2. **Priority Action Plan (3-4 specific items):** Based on their worst problem areas, give concrete, actionable steps with timelines. Be specific about what to do and when.
+            
+            3. **This Week's Focus:** One primary goal for the next 7 days with daily implementation steps.
+            
+            4. **Optimization Tips:** 2-3 advanced strategies tailored to their specific patterns (e.g., if they have late caffeine issues, give specific caffeine management advice).
+            
+            5. **Progress Tracking:** Tell them what metrics to watch and what improvements to expect by when.
+            
+            Make it personal, encouraging, and evidence-based. Use their actual numbers and trends. Be specific rather than generic.
             """
+            
             llm_response = await generate_gemini_text(prompt)
+            
+        else:
+            # Fallback for users without sufficient data
+            llm_response = await self._generate_general_coaching_advice(message)
+        
+        # Compile final response
+        final_sections = []
+        
+        if safety_warnings:
+            final_sections.append("\n".join(safety_warnings))
+            
+        if llm_response:
+            final_sections.append(llm_response)
+        else:
+            final_sections.append("I'd love to help you improve your sleep! To give you the most personalized advice, please log a few nights of sleep data first. In the meantime, focus on consistent wake times and a relaxing bedtime routine.")
+        
+        final_sections.append(f"{DISCLAIMER}")
+        
+        # Prepare response data
+        response_data = {
+            "safety_concerns": safety_concerns,
+            "analysis": analysis,
+            "coaching_framework": "cbt_i_enhanced"
+        }
+        
+        if analysis:
+            response_data["plan"] = self._generate_personalized_plan(analysis, message)
+        
+        return {
+            "agent": self.name, 
+            "text": "\n\n".join(final_sections),
+            "data": response_data
+        }
 
-        # Fallback to the old rule-based plan if the LLM fails or there's no summary
-        if not llm_response:
-            tips = _plan_from_summary(summary if isinstance(summary, dict) else {})
-            plan = "\n".join(f"• {t}" for t in tips)
-            llm_response = f"Here’s a 7-day plan based on your recent logs:\n{plan}"
-
-        final_text = f"{llm_response.strip()}\n\n_{DISCLAIMER}_"
-
-        safety = self._flag_safety(message)
-        if safety:
-            final_text += "\n\n**Safety:** Please consult a clinician for red-flag symptoms."
-        return {"agent": self.name, "text": final_text, "data": {"safety": safety}}
+    async def _generate_general_coaching_advice(self, message: str) -> str:
+        """Generate general advice for users without sleep data."""
+        prompt = f"""
+        You are a sleep coach helping someone who hasn't logged detailed sleep data yet.
+        
+        User's message: "{message}"
+        
+        Provide helpful, general sleep improvement advice that covers:
+        1. Sleep hygiene fundamentals
+        2. Creating a bedtime routine  
+        3. Environment optimization
+        4. Timing and consistency tips
+        5. Encourage them to start tracking their sleep
+        
+        Keep it actionable and encouraging. Limit to 4-5 key points.
+        """
+        
+        response = await generate_gemini_text(prompt)
+        return response or "Focus on these fundamentals: consistent sleep schedule, cool dark bedroom, no screens 1 hour before bed, and no caffeine after 2pm. Start logging your sleep so I can give you personalized advice!"
