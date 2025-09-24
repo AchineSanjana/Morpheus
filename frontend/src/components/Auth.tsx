@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase, supabaseSession } from "../lib/supabaseClient";
+import morpheusLogo from "../assets/morpheus_logo.jpg";
 
 export function Auth({ onAuthed }:{ onAuthed:()=>void }) {
   const [email,setEmail]=useState(""); 
@@ -10,14 +11,31 @@ export function Auth({ onAuthed }:{ onAuthed:()=>void }) {
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
 
-  // Prefill email from previous "remember" choice
+  // Clear stored password when rememberMe is unchecked
+  useEffect(() => {
+    if (!rememberMe) {
+      try {
+        localStorage.removeItem("morpheus:password");
+      } catch (e) {
+        // ignore storage errors
+      }
+    }
+  }, [rememberMe]);
+
+  // Prefill email and password from previous "remember" choice
   useEffect(() => {
     try {
       const storedRemember = localStorage.getItem("morpheus:remember");
       const storedEmail = localStorage.getItem("morpheus:email");
+      const storedPassword = localStorage.getItem("morpheus:password");
+      
       if (storedRemember === "1" && storedEmail) {
         setEmail(storedEmail);
         setRememberMe(true);
+        // Only restore password if remember me was explicitly enabled
+        if (storedPassword) {
+          setPassword(storedPassword);
+        }
       } else if (storedEmail) {
         // if email stored but remember flag absent, set it as not remembered
         setEmail(storedEmail);
@@ -40,7 +58,7 @@ export function Auth({ onAuthed }:{ onAuthed:()=>void }) {
     setStatus({type:"idle"});
 
     if (mode==="signup"){
-  const {error}=await supabase.auth.signUp({ email, password });
+      const {error}=await supabase.auth.signUp({ email, password });
       if (error) {
         setStatus({type:"error", msg: error.message});
       } else {
@@ -63,14 +81,16 @@ export function Auth({ onAuthed }:{ onAuthed:()=>void }) {
       if (error) {
         setStatus({type:"error", msg: error.message});
       } else {
-        // persist email if requested (do NOT store password)
+        // persist email and password if requested
         try {
           if (rememberMe) {
             localStorage.setItem("morpheus:email", email);
+            localStorage.setItem("morpheus:password", password);
             localStorage.setItem("morpheus:remember", "1");
           } else {
-            // keep email to help with autofill but clear the remember flag
+            // keep email to help with autofill but clear the remember flag and password
             localStorage.removeItem("morpheus:remember");
+            localStorage.removeItem("morpheus:password");
             // optionally remove email as well to be strict
             // localStorage.removeItem("morpheus:email");
           }
@@ -84,49 +104,64 @@ export function Auth({ onAuthed }:{ onAuthed:()=>void }) {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-zinc-900 via-zinc-800 to-zinc-900 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 flex items-center justify-center p-4">
       {/* Background decoration */}
       <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-violet-500/20 rounded-full blur-3xl"></div>
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-emerald-500/20 rounded-full blur-3xl"></div>
+        <div className="absolute -top-40 -right-40 w-80 h-80 bg-indigo-400/15 rounded-full blur-3xl"></div>
+        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-cyan-400/15 rounded-full blur-3xl"></div>
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-purple-400/10 rounded-full blur-3xl"></div>
       </div>
 
       <div className="relative w-full max-w-md">
         {/* Main auth card */}
-        <div className="bg-zinc-900/80 backdrop-blur-xl border border-zinc-700/50 rounded-2xl p-8 shadow-2xl">
+        <div className="bg-slate-900/85 backdrop-blur-xl border border-slate-700/50 rounded-2xl p-8 shadow-2xl">
           {/* Header */}
           <div className="text-center mb-8">
-            <div className="w-16 h-16 bg-gradient-to-br from-violet-500 to-emerald-500 rounded-2xl flex items-center justify-center text-3xl mb-4 mx-auto">
-              💤
+            <div className="w-16 h-16 bg-gradient-to-br from-indigo-500 to-cyan-500 rounded-2xl flex items-center justify-center mb-4 mx-auto overflow-hidden p-1">
+              <img 
+                src={morpheusLogo} 
+                alt="Morpheus Logo" 
+                className="w-full h-full object-contain rounded-xl"
+              />
             </div>
-            <h1 className="text-2xl font-bold bg-gradient-to-r from-violet-400 to-emerald-400 bg-clip-text text-transparent">
+            <h1 className="text-2xl font-bold bg-gradient-to-r from-indigo-400 to-cyan-400 bg-clip-text text-transparent">
               Morpheus
             </h1>
-            <p className="text-zinc-400 text-sm mt-2">
+            <p className="text-slate-400 text-sm mt-2">
               Your AI-powered sleep improvement companion
             </p>
           </div>
 
           {/* Tab switcher */}
-          <div className="flex bg-zinc-800/50 rounded-xl p-1 mb-6">
+          <div className="flex bg-slate-800/60 rounded-xl p-1 mb-6">
             <button
               type="button"
-              onClick={() => {setMode("signin"); setStatus({type:"idle"});}}
+              onClick={() => {
+                setMode("signin"); 
+                setStatus({type:"idle"});
+                // Clear password when switching to signin to allow fresh login
+                if (mode !== "signin") setPassword("");
+              }}
               className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-all duration-200 ${
                 mode === "signin" 
-                  ? "bg-gradient-to-r from-violet-600 to-emerald-600 text-white shadow-lg" 
-                  : "text-zinc-400 hover:text-zinc-200"
+                  ? "bg-gradient-to-r from-indigo-600 to-cyan-600 text-white shadow-lg" 
+                  : "text-slate-400 hover:text-slate-200"
               }`}
             >
               Sign In
             </button>
             <button
               type="button"
-              onClick={() => {setMode("signup"); setStatus({type:"idle"});}}
+              onClick={() => {
+                setMode("signup"); 
+                setStatus({type:"idle"});
+                // Clear password when switching to signup for security
+                setPassword("");
+              }}
               className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-all duration-200 ${
                 mode === "signup" 
-                  ? "bg-gradient-to-r from-violet-600 to-emerald-600 text-white shadow-lg" 
-                  : "text-zinc-400 hover:text-zinc-200"
+                  ? "bg-gradient-to-r from-indigo-600 to-cyan-600 text-white shadow-lg" 
+                  : "text-slate-400 hover:text-slate-200"
               }`}
             >
               Sign Up
@@ -137,38 +172,42 @@ export function Auth({ onAuthed }:{ onAuthed:()=>void }) {
           <form onSubmit={submit} className="space-y-6">
             <div className="space-y-4">
               <label className="flex flex-col gap-2 text-sm">
-                <span className="font-medium text-zinc-200 flex items-center gap-2">
+                <span className="font-medium text-slate-200 flex items-center gap-2">
                   📧 Email
                 </span>
                 <input
                   type="email"
+                  name="email"
+                  autoComplete="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
-                  className="bg-zinc-800/80 border border-zinc-600/50 p-3 rounded-xl transition-all duration-200 focus:border-violet-400 focus:bg-zinc-800 focus:ring-2 focus:ring-violet-400/20 focus:outline-none"
+                  className="bg-slate-800/80 border border-slate-600/50 p-3 rounded-xl transition-all duration-200 focus:border-indigo-400 focus:bg-slate-800 focus:ring-2 focus:ring-indigo-400/20 focus:outline-none"
                   placeholder="your@email.com"
                 />
               </label>
               {/* Only show password input when not in reset mode */}
               {mode !== "reset" && (
                 <label className="flex flex-col gap-2 text-sm">
-                  <span className="font-medium text-zinc-200 flex items-center gap-2">
+                  <span className="font-medium text-slate-200 flex items-center gap-2">
                     🔒 Password
                   </span>
                   <div className="relative">
                     <input
                       type={showPassword ? "text" : "password"}
+                      name="password"
+                      autoComplete={mode === "signin" ? "current-password" : "new-password"}
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       required
                       minLength={6}
-                      className="bg-zinc-800/80 border border-zinc-600/50 p-3 rounded-xl transition-all duration-200 focus:border-violet-400 focus:bg-zinc-800 focus:ring-2 focus:ring-violet-400/20 focus:outline-none w-full"
+                      className="bg-slate-800/80 border border-slate-600/50 p-3 rounded-xl transition-all duration-200 focus:border-indigo-400 focus:bg-slate-800 focus:ring-2 focus:ring-indigo-400/20 focus:outline-none w-full"
                       placeholder="••••••••"
                     />
                     <button
                       type="button"
                       onClick={() => setShowPassword(s => !s)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-200 p-1"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 p-1"
                       aria-label={showPassword ? "Hide password" : "Show password"}
                     >
                       {showPassword ? (
@@ -193,7 +232,7 @@ export function Auth({ onAuthed }:{ onAuthed:()=>void }) {
             {/* Inline row: Remember me (left) and Forgot password (right) */}
             {mode === "signin" && (
               <div className="flex items-center justify-between mt-2">
-                <label htmlFor="remember" className="flex items-center gap-2 text-sm text-zinc-400">
+                <label htmlFor="remember" className="flex items-center gap-2 text-sm text-slate-400">
                   <input
                     id="remember"
                     type="checkbox"
@@ -207,7 +246,7 @@ export function Auth({ onAuthed }:{ onAuthed:()=>void }) {
                 <button
                   type="button"
                   onClick={() => { setMode("reset"); setStatus({ type: "idle" }); }}
-                  className="text-xs text-emerald-400 hover:text-emerald-300 underline"
+                  className="text-xs text-cyan-400 hover:text-cyan-300 underline"
                 >
                   Forgot password?
                 </button>
@@ -218,7 +257,7 @@ export function Auth({ onAuthed }:{ onAuthed:()=>void }) {
             {status.type !== "idle" && (
               <div className={`flex items-center gap-2 p-3 rounded-xl text-sm ${
                 status.type === "success" 
-                  ? "bg-emerald-500/10 border border-emerald-500/20 text-emerald-400" 
+                  ? "bg-cyan-500/10 border border-cyan-500/20 text-cyan-400" 
                   : "bg-rose-500/10 border border-rose-500/20 text-rose-400"
               }`}>
                 <span>{status.type === "success" ? "✅" : "❌"}</span>
@@ -229,7 +268,7 @@ export function Auth({ onAuthed }:{ onAuthed:()=>void }) {
             {/* Submit button */}
             <button
               disabled={loading || !email || (mode !== "reset" && !password)}
-              className="w-full bg-gradient-to-r from-violet-600 to-emerald-600 disabled:from-zinc-600 disabled:to-zinc-600 disabled:cursor-not-allowed hover:from-violet-500 hover:to-emerald-500 py-3 rounded-xl text-sm font-medium transition-all duration-200 shadow-lg hover:shadow-xl disabled:shadow-none transform hover:scale-[1.02] disabled:scale-100 flex items-center justify-center gap-2"
+              className="w-full bg-gradient-to-r from-indigo-600 to-cyan-600 disabled:from-slate-600 disabled:to-slate-600 disabled:cursor-not-allowed hover:from-indigo-500 hover:to-cyan-500 py-3 rounded-xl text-sm font-medium transition-all duration-200 shadow-lg hover:shadow-xl disabled:shadow-none transform hover:scale-[1.02] disabled:scale-100 flex items-center justify-center gap-2"
             >
               {loading ? (
                 <>
@@ -245,15 +284,15 @@ export function Auth({ onAuthed }:{ onAuthed:()=>void }) {
           </form>
 
           {/* Footer */}
-          <div className="mt-6 pt-6 border-t border-zinc-700/50">
-            <p className="text-xs text-zinc-500 text-center leading-relaxed">
+          <div className="mt-6 pt-6 border-t border-slate-700/50">
+            <p className="text-xs text-slate-500 text-center leading-relaxed">
               {mode === "signin" ? (
                 <>
                   New to Morpheus?{" "}
                   <button
                     type="button"
                     onClick={() => {setMode("signup"); setStatus({type:"idle"});}}
-                    className="text-emerald-400 hover:text-emerald-300 underline"
+                    className="text-cyan-400 hover:text-cyan-300 underline"
                   >
                     Create an account
                   </button>
@@ -264,14 +303,14 @@ export function Auth({ onAuthed }:{ onAuthed:()=>void }) {
                   <button
                     type="button"
                     onClick={() => {setMode("signin"); setStatus({type:"idle"});}}
-                    className="text-violet-400 hover:text-violet-300 underline"
+                    className="text-indigo-400 hover:text-indigo-300 underline"
                   >
                     Sign in
                   </button>
                 </>
               )}
             </p>
-            <p className="text-xs text-zinc-600 text-center mt-3">
+            <p className="text-xs text-slate-600 text-center mt-3">
               By continuing, you agree to our Terms of Service and Privacy Policy
             </p>
           </div>
@@ -279,7 +318,7 @@ export function Auth({ onAuthed }:{ onAuthed:()=>void }) {
 
         {/* Bottom tagline */}
         <div className="text-center mt-6">
-          <p className="text-zinc-500 text-sm">
+          <p className="text-slate-500 text-sm">
             Transform your sleep with AI-powered insights and coaching
           </p>
         </div>

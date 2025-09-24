@@ -54,3 +54,79 @@ export async function fetchMessages(token: string, opts?: { limit?: number; befo
   if (!res.ok) throw new Error("failed to fetch messages");
   return res.json() as Promise<{ messages: Message[]; count: number }>;
 }
+
+// Profile management types and functions
+export type ProfileData = {
+  id: string;
+  full_name: string | null;
+  username: string | null;
+  avatar_url: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export async function fetchProfile(userId: string, token: string): Promise<ProfileData | null> {
+  try {
+    const api = import.meta.env.VITE_API_URL as string;
+    const res = await fetch(`${api}/profile/${userId}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    if (!res.ok) {
+      if (res.status === 404) return null;
+      const errorText = await res.text();
+      throw new Error(`Failed to fetch profile: ${errorText}`);
+    }
+    return await res.json() as ProfileData;
+  } catch (error) {
+    console.error("Error fetching profile:", error);
+    return null;
+  }
+}
+
+export async function updateProfile(userId: string, updates: Partial<ProfileData>, token: string): Promise<ProfileData> {
+  const api = import.meta.env.VITE_API_URL as string;
+  const res = await fetch(`${api}/profile/${userId}`, {
+    method: "PUT",
+    headers: { 
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}` 
+    },
+    body: JSON.stringify(updates)
+  });
+  
+  if (!res.ok) {
+    const errorText = await res.text();
+    throw new Error(`Failed to update profile: ${errorText}`);
+  }
+  
+  return await res.json() as ProfileData;
+}
+
+export async function uploadAvatar(file: File, userId: string, token: string): Promise<string> {
+  // Validate file on client side
+  if (!file.type.startsWith('image/')) {
+    throw new Error("Please select an image file.");
+  }
+  
+  if (file.size > 5 * 1024 * 1024) {
+    throw new Error("File size must be less than 5MB.");
+  }
+
+  const formData = new FormData();
+  formData.append("avatar", file);
+  
+  const api = import.meta.env.VITE_API_URL as string;
+  const res = await fetch(`${api}/profile/${userId}/avatar`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: formData
+  });
+  
+  if (!res.ok) {
+    const errorText = await res.text();
+    throw new Error(`Failed to upload avatar: ${errorText}`);
+  }
+  
+  const data = await res.json() as { avatar_url: string };
+  return data.avatar_url;
+}

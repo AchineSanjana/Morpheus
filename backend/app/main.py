@@ -1,6 +1,6 @@
 ﻿# app/main.py
 import os, asyncio
-from fastapi import FastAPI, Header, HTTPException
+from fastapi import FastAPI, Header, HTTPException, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from .schemas import ChatRequest, SleepLogIn
@@ -13,6 +13,8 @@ from app.agents import AgentContext
 
 from typing import Optional, List
 from fastapi import Query
+import uuid
+from pathlib import Path
 
 app = FastAPI(title="Morpheus API")
 
@@ -40,6 +42,208 @@ async def upsert_sleep_log(payload: SleepLogIn, authorization: str = Header(defa
         raise HTTPException(401, "Unauthorized")
     await insert_sleep_log(user["id"], payload.dict())
     return {"ok": True}
+
+# ---------------------- PROFILE MANAGEMENT ----------------------
+
+@app.get("/profile/{user_id}")
+async def get_profile(user_id: str, authorization: str = Header(default="")):
+    user = await get_current_user(authorization.replace("Bearer ", ""))
+    if not user or user["id"] != user_id:
+        raise HTTPException(401, "Unauthorized")
+    
+    def _fetch_or_create():
+        print(f"Attempting to fetch profile for user_id: {user_id}")
+        try:
+            # Try to fetch existing profile
+            result = supabase.table("user_profile").select("*").eq("id", user_id).single().execute()
+            print(f"Profile fetch result: {result}")
+            if result.data:
+                print(f"Found existing profile: {result.data}")
+                return result.data
+            else:
+                print("No profile data returned, will create new profile")
+                raise Exception("No rows returned")
+        except Exception as e:
+            print(f"Profile fetch error: {e}")
+            error_str = str(e).lower()
+            if "no rows returned" in error_str or "not found" in error_str or "pgrst116" in error_str:
+                # Profile doesn't exist, create one
+                print("Creating new profile...")
+                try:
+                    # Get user email from auth user data for better defaults
+                    user_email = user.get("email", "")
+                    username = user_email.split("@")[0] if user_email else f"user_{user_id[:8]}"
+                    print(f"Creating profile with username: {username} for email: {user_email}")
+                    
+                    new_profile = {
+                        "id": user_id,
+                        "full_name": None,
+                        "username": username,
+                        "avatar_url": None
+                    }
+                    print(f"Inserting profile: {new_profile}")
+                    create_result = supabase.table("user_profile").insert(new_profile).execute()
+                    print(f"Profile creation result: {create_result}")
+                    
+                    if create_result.data and len(create_result.data) > 0:
+                        print(f"Successfully created profile: {create_result.data[0]}")
+                        return create_result.data[0]
+                    else:
+                        print("No data returned from profile creation")
+                        return new_profile
+                except Exception as create_error:
+                    print(f"Failed to create profile: {create_error}")
+                    print(f"Create error type: {type(create_error)}")
+                    raise create_error
+            else:
+                print(f"Non-recoverable database error: {e}")
+                raise e
+    
+    try:
+        profile = await run_in_threadpool(_fetch_or_create)
+        return profile
+    except Exception as e:
+        error_msg = str(e)
+        print(f"Profile fetch/create error: {error_msg}")
+        raise HTTPException(500, f"Database error: {error_msg}")
+
+@app.put("/profile/{user_id}")
+async def update_profile(user_id: str, updates: dict, authorization: str = Header(default="")):
+    user = await get_current_user(authorization.replace("Bearer ", ""))
+    if not user or user["id"] != user_id:
+        raise HTTPException(401, "Unauthorized")
+    
+    # Only allow specific fields to be updated
+    allowed_fields = {"full_name", "username", "avatar_url"}
+    filtered_updates = {k: v for k, v in updates.items() if k in allowed_fields}
+    
+    if not filtered_updates:
+        raise HTTPException(400, "No valid fields to update")
+    
+    def _update():
+        result = supabase.table("user_profile").update(filtered_updates).eq("id", user_id).execute()
+        return result.data[0] if result.data else None
+    
+    try:
+        profile = await run_in_threadpool(_update)
+        return profile
+    except Exception as e:
+        raise HTTPException(500, f"Database error: {str(e)}")
+
+@app.post("/profile/{user_id}")
+async def create_profile(user_id: str, authorization: str = Header(default="")):
+    user = await get_current_user(authorization.replace("Bearer ", ""))
+    if not user or user["id"] != user_id:
+        raise HTTPException(401, "Unauthorized")
+    
+    def _create():
+        # Check if profile already exists
+        try:
+            existing = supabase.table("user_profile").select("*").eq("id", user_id).single().execute()
+            if existing.data:
+                return existing.data  # Return existing profile
+        except:
+            pass  # Profile doesn't exist, create it
+        
+        # Create new profile
+        user_email = user.get("email", "")
+        username = user_email.split("@")[0] if user_email else f"user_{user_id[:8]}"
+        
+        new_profile = {
+            "id": user_id,
+            "full_name": None,
+            "username": username,
+            "avatar_url": None
+        }
+        result = supabase.table("user_profile").insert(new_profile).execute()
+        return result.data[0] if result.data else new_profile
+    
+    try:
+        profile = await run_in_threadpool(_create)
+        return profile
+    except Exception as e:
+        error_msg = str(e)
+        print(f"Profile creation error: {error_msg}")
+        raise HTTPException(500, f"Failed to create profile: {error_msg}")
+
+@app.get("/debug/table-check")
+async def check_table(authorization: str = Header(default="")):
+    user = await get_current_user(authorization.replace("Bearer ", ""))
+    if not user:
+        raise HTTPException(401, "Unauthorized")
+    
+    def _check():
+        try:
+            # Try to select from user_profile table
+            result = supabase.table("user_profile").select("id").limit(1).execute()
+            return {"table_exists": True, "sample_data": result.data}
+        except Exception as e:
+            return {"table_exists": False, "error": str(e)}
+    
+    try:
+        check_result = await run_in_threadpool(_check)
+        return check_result
+    except Exception as e:
+        return {"table_exists": False, "error": str(e)}
+
+@app.post("/profile/{user_id}/avatar")
+async def upload_avatar(
+    user_id: str,
+    avatar: UploadFile = File(...),
+    authorization: str = Header(default="")
+):
+    user = await get_current_user(authorization.replace("Bearer ", ""))
+    if not user or user["id"] != user_id:
+        raise HTTPException(401, "Unauthorized")
+    
+    # Validate file type
+    if not avatar.content_type or not avatar.content_type.startswith("image/"):
+        raise HTTPException(400, "File must be an image")
+    
+    # Validate file size (5MB max)
+    file_content = await avatar.read()
+    if len(file_content) > 5 * 1024 * 1024:  # 5MB
+        raise HTTPException(400, "File size must be less than 5MB")
+    
+    # Generate unique filename
+    file_extension = Path(avatar.filename or "").suffix or ".jpg"
+    filename = f"{user_id}/{uuid.uuid4()}{file_extension}"
+    
+    def _upload():
+        # Delete old avatar if exists
+        try:
+            # Get current avatar
+            profile = supabase.table("user_profile").select("avatar_url").eq("id", user_id).single().execute()
+            if profile.data and profile.data.get("avatar_url"):
+                old_url = profile.data["avatar_url"]
+                # Extract filename from URL to delete old file
+                if "/avatars/" in old_url:
+                    old_filename = old_url.split("/avatars/")[-1]
+                    supabase.storage.from_("avatars").remove([old_filename])
+        except:
+            pass  # Ignore errors when deleting old avatar
+        
+        # Upload new avatar
+        try:
+            result = supabase.storage.from_("avatars").upload(filename, file_content)
+            # The upload response doesn't have an error attribute - if it fails, it raises an exception
+        except Exception as upload_error:
+            raise Exception(f"Upload failed: {str(upload_error)}")
+        
+        # Get public URL
+        public_url_data = supabase.storage.from_("avatars").get_public_url(filename)
+        public_url = public_url_data.publicUrl if hasattr(public_url_data, 'publicUrl') else public_url_data
+        
+        # Update profile with new avatar URL
+        supabase.table("user_profile").update({"avatar_url": public_url}).eq("id", user_id).execute()
+        
+        return public_url
+    
+    try:
+        avatar_url = await run_in_threadpool(_upload)
+        return {"avatar_url": avatar_url}
+    except Exception as e:
+        raise HTTPException(500, f"Upload error: {str(e)}")
 
 # ---------------------- CHAT ----------------------
 

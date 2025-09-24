@@ -150,68 +150,68 @@ export function SleepLogForm() {
   return (
     <div className="relative">
       {/* Background gradient overlay */}
-      <div className="absolute inset-0 bg-gradient-to-br from-violet-500/10 via-transparent to-emerald-500/10 rounded-2xl blur-xl"></div>
+      <div className="absolute inset-0 bg-gradient-to-br from-indigo-400/10 via-transparent to-cyan-400/10 rounded-2xl blur-xl"></div>
       
-      <form onSubmit={submit} className="relative bg-gradient-to-br from-zinc-900/95 to-zinc-800/95 backdrop-blur-sm border border-zinc-700/50 p-6 rounded-2xl mb-6 space-y-6 shadow-2xl shadow-black/20" aria-describedby="sleep-form-status">
+      <form onSubmit={submit} className="relative bg-gradient-to-br from-slate-900/95 to-slate-800/95 backdrop-blur-sm border border-slate-700/50 p-6 rounded-2xl mb-6 space-y-6 shadow-2xl shadow-black/20" aria-describedby="sleep-form-status">
         {/* Header */}
-        <div className="flex items-center gap-3 pb-2 border-b border-zinc-700/50">
-          <div className="w-8 h-8 bg-gradient-to-br from-violet-500 to-emerald-500 rounded-full flex items-center justify-center text-white text-sm font-bold">💤</div>
-          <h2 className="text-lg font-semibold bg-gradient-to-r from-violet-400 to-emerald-400 bg-clip-text text-transparent">Log Last Night</h2>
+        <div className="flex items-center gap-3 pb-2 border-b border-slate-700/50">
+          <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-cyan-500 rounded-full flex items-center justify-center text-white text-sm font-bold">💤</div>
+          <h2 className="text-lg font-semibold bg-gradient-to-r from-indigo-400 to-cyan-400 bg-clip-text text-transparent">Log Last Night</h2>
         </div>
 
         <div className="grid sm:grid-cols-3 gap-4">
           <label className="flex flex-col gap-2 text-sm group">
-            <span className="font-medium text-zinc-200 flex items-center gap-2">
+            <span className="font-medium text-slate-200 flex items-center gap-2">
               📅 Date<span className="text-rose-400">*</span>
             </span>
-            <input required className="bg-zinc-800/80 border border-zinc-600/50 p-3 rounded-xl transition-all duration-200 focus:border-violet-400 focus:bg-zinc-800 focus:ring-2 focus:ring-violet-400/20 focus:outline-none" type="date" value={date} onChange={e=>setDate(e.target.value)} />
+            <input required className="bg-slate-800/80 border border-slate-600/50 p-3 rounded-xl transition-all duration-200 focus:border-indigo-400 focus:bg-slate-800 focus:ring-2 focus:ring-indigo-400/20 focus:outline-none" type="date" value={date} onChange={e=>setDate(e.target.value)} />
           </label>
           <label className="flex flex-col gap-2 text-sm group sm:col-span-1">
-            <span className="font-medium text-zinc-200 flex items-center justify-between">
+            <span className="font-medium text-slate-200 flex items-center justify-between">
               <span className="flex items-center gap-2">🌙 Bedtime</span>
-              <button type="button" onClick={setNowAsBed} className="text-xs text-emerald-400 hover:text-emerald-300 transition-colors px-2 py-1 rounded-md hover:bg-emerald-400/10">Now</button>
+              <button type="button" onClick={setNowAsBed} className="text-xs text-cyan-400 hover:text-cyan-300 transition-colors px-2 py-1 rounded-md hover:bg-cyan-400/10">Now</button>
             </span>
-            <input className="bg-zinc-800/80 border border-zinc-600/50 p-3 rounded-xl transition-all duration-200 focus:border-violet-400 focus:bg-zinc-800 focus:ring-2 focus:ring-violet-400/20 focus:outline-none" type="datetime-local" value={bedtime} onChange={e=>setBedtime(e.target.value)} />
+            <input className="bg-slate-800/80 border border-slate-600/50 p-3 rounded-xl transition-all duration-200 focus:border-indigo-400 focus:bg-slate-800 focus:ring-2 focus:ring-indigo-400/20 focus:outline-none" type="datetime-local" value={bedtime} onChange={e=>setBedtime(e.target.value)} />
           </label>
           <label className="flex flex-col gap-2 text-sm group sm:col-span-1">
-            <span className="font-medium text-zinc-200 flex items-center justify-between">
+            <span className="font-medium text-slate-200 flex items-center justify-between">
               <span className="flex items-center gap-2">☀️ Wake time</span>
               <div className="flex gap-1">
-                <button type="button" onClick={setNowAsWake} className="text-xs text-emerald-400 hover:text-emerald-300 transition-colors px-2 py-1 rounded-md hover:bg-emerald-400/10">Now</button>
-                {bedtime && <button type="button" onClick={()=>setWakePlus(7)} className="text-xs text-emerald-400 hover:text-emerald-300 transition-colors px-2 py-1 rounded-md hover:bg-emerald-400/10">+7h</button>}
-                {bedtime && <button type="button" onClick={()=>setWakePlus(8)} className="text-xs text-emerald-400 hover:text-emerald-300 transition-colors px-2 py-1 rounded-md hover:bg-emerald-400/10">+8h</button>}
+                <button type="button" onClick={setNowAsWake} className="text-xs text-cyan-400 hover:text-cyan-300 transition-colors px-2 py-1 rounded-md hover:bg-cyan-400/10">Now</button>
+                {bedtime && <button type="button" onClick={()=>setWakePlus(7)} className="text-xs text-cyan-400 hover:text-cyan-300 transition-colors px-2 py-1 rounded-md hover:bg-cyan-400/10">+7h</button>}
+                {bedtime && <button type="button" onClick={()=>setWakePlus(8)} className="text-xs text-cyan-400 hover:text-cyan-300 transition-colors px-2 py-1 rounded-md hover:bg-cyan-400/10">+8h</button>}
               </div>
             </span>
-            <input className="bg-zinc-800/80 border border-zinc-600/50 p-3 rounded-xl transition-all duration-200 focus:border-violet-400 focus:bg-zinc-800 focus:ring-2 focus:ring-violet-400/20 focus:outline-none" type="datetime-local" value={wake} onChange={e=>setWake(e.target.value)} />
+            <input className="bg-slate-800/80 border border-slate-600/50 p-3 rounded-xl transition-all duration-200 focus:border-indigo-400 focus:bg-slate-800 focus:ring-2 focus:ring-indigo-400/20 focus:outline-none" type="datetime-local" value={wake} onChange={e=>setWake(e.target.value)} />
           </label>
         </div>      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex flex-col xs:flex-row gap-4">
           <label className="flex flex-col gap-2 text-sm w-full max-w-[12rem] group">
-            <span className="font-medium text-zinc-200 flex items-center gap-2">🔢 Awakenings</span>
-            <input className="bg-zinc-800/80 border border-zinc-600/50 p-3 rounded-xl transition-all duration-200 focus:border-violet-400 focus:bg-zinc-800 focus:ring-2 focus:ring-violet-400/20 focus:outline-none" type="number" min={0} value={awakenings} onChange={e=>setAwaken(parseInt(e.target.value||"0"))} />
+            <span className="font-medium text-slate-200 flex items-center gap-2">🔢 Awakenings</span>
+            <input className="bg-slate-800/80 border border-slate-600/50 p-3 rounded-xl transition-all duration-200 focus:border-indigo-400 focus:bg-slate-800 focus:ring-2 focus:ring-indigo-400/20 focus:outline-none" type="number" min={0} value={awakenings} onChange={e=>setAwaken(parseInt(e.target.value||"0"))} />
           </label>
           {durationLabel && (
-            <div className={`text-sm font-medium sm:self-end sm:mb-1 px-3 py-2 rounded-xl bg-zinc-800/50 border border-zinc-600/30 ${durationLabel.color} flex items-center gap-2`}>
+            <div className={`text-sm font-medium sm:self-end sm:mb-1 px-3 py-2 rounded-xl bg-slate-800/50 border border-slate-600/30 ${durationLabel.color} flex items-center gap-2`}>
               ⏰ {durationLabel.text}
             </div>
           )}
         </div>
-        <button type="button" onClick={()=>setShowAdvanced(s=>!s)} className="flex items-center gap-2 text-sm text-emerald-400 hover:text-emerald-300 transition-colors px-3 py-2 rounded-xl hover:bg-emerald-400/10 border border-emerald-400/20">
+        <button type="button" onClick={()=>setShowAdvanced(s=>!s)} className="flex items-center gap-2 text-sm text-cyan-400 hover:text-cyan-300 transition-colors px-3 py-2 rounded-xl hover:bg-cyan-400/10 border border-cyan-400/20">
           {showAdvanced ? "⬆️ Hide" : "⬇️ Show"} lifestyle fields
         </button>
       </div>
 
       {showAdvanced && (
         <div className="grid sm:grid-cols-3 gap-4 items-end animate-in slide-in-from-top-2 duration-300">
-          <label className="flex items-center gap-3 text-sm p-3 rounded-xl bg-zinc-800/50 border border-zinc-600/30 hover:bg-zinc-800/70 transition-colors cursor-pointer" title="Any caffeine (coffee, tea, energy drink) consumed after 3pm?">
-            <input type="checkbox" className="h-5 w-5 rounded accent-emerald-500" checked={caffeine} onChange={e=>setCaffeine(e.target.checked)} />
-            <span className="text-zinc-200">☕ Caffeine after 3pm</span>
+          <label className="flex items-center gap-3 text-sm p-3 rounded-xl bg-slate-800/50 border border-slate-600/30 hover:bg-slate-800/70 transition-colors cursor-pointer" title="Any caffeine (coffee, tea, energy drink) consumed after 3pm?">
+            <input type="checkbox" className="h-5 w-5 rounded accent-cyan-500" checked={caffeine} onChange={e=>setCaffeine(e.target.checked)} />
+            <span className="text-slate-200">☕ Caffeine after 3pm</span>
           </label>
-          <label className="flex items-center gap-3 text-sm p-3 rounded-xl bg-zinc-800/50 border border-zinc-600/30 hover:bg-zinc-800/70 transition-colors cursor-pointer" title="Alcohol consumed in the evening?">
-            <input type="checkbox" className="h-5 w-5 rounded accent-emerald-500" checked={alcohol} onChange={e=>setAlcohol(e.target.checked)} />
-            <span className="text-zinc-200">🍷 Alcohol</span>
+          <label className="flex items-center gap-3 text-sm p-3 rounded-xl bg-slate-800/50 border border-slate-600/30 hover:bg-slate-800/70 transition-colors cursor-pointer" title="Alcohol consumed in the evening?">
+            <input type="checkbox" className="h-5 w-5 rounded accent-cyan-500" checked={alcohol} onChange={e=>setAlcohol(e.target.checked)} />
+            <span className="text-slate-200">🍷 Alcohol</span>
           </label>
-          <div className="text-xs text-zinc-400 sm:col-span-1 flex items-center gap-2">
+          <div className="text-xs text-slate-400 sm:col-span-1 flex items-center gap-2">
             💡 These factors help coaching personalize advice.
           </div>
         </div>
@@ -220,8 +220,8 @@ export function SleepLogForm() {
       <div className="space-y-3">
         <label className="flex flex-col gap-3 text-sm w-full group">
           <div className="flex items-center justify-between">
-            <span className="font-medium text-zinc-200 flex items-center gap-2">📱 Screen time before bed</span>
-            <span className="text-sm font-medium text-emerald-400 bg-emerald-400/10 px-3 py-1 rounded-full">{screen} min</span>
+            <span className="font-medium text-slate-200 flex items-center gap-2">📱 Screen time before bed</span>
+            <span className="text-sm font-medium text-cyan-400 bg-cyan-400/10 px-3 py-1 rounded-full">{screen} min</span>
           </div>
           <div className="relative">
             <input 
@@ -232,15 +232,15 @@ export function SleepLogForm() {
               step={5} 
               value={screen} 
               onChange={e=>setScreen(parseInt(e.target.value||"0"))} 
-              className="w-full h-2 bg-zinc-700 rounded-lg appearance-none cursor-pointer slider touch-pan-x
+              className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer slider touch-pan-x
                          [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:w-5 
-                         [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-gradient-to-r [&::-webkit-slider-thumb]:from-violet-500 [&::-webkit-slider-thumb]:to-emerald-500
+                         [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-gradient-to-r [&::-webkit-slider-thumb]:from-indigo-500 [&::-webkit-slider-thumb]:to-cyan-500
                          [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:shadow-lg [&::-webkit-slider-thumb]:transition-transform
                          [&::-webkit-slider-thumb]:hover:scale-110 [&::-moz-range-thumb]:h-5 [&::-moz-range-thumb]:w-5 
-                         [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-gradient-to-r [&::-moz-range-thumb]:from-violet-500 [&::-moz-range-thumb]:to-emerald-500
+                         [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-gradient-to-r [&::-moz-range-thumb]:from-indigo-500 [&::-moz-range-thumb]:to-cyan-500
                          [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:border-0" 
             />
-            <div className="absolute top-3 left-0 right-0 flex justify-between text-xs text-zinc-500 pointer-events-none">
+            <div className="absolute top-3 left-0 right-0 flex justify-between text-xs text-slate-500 pointer-events-none">
               <span>0</span>
               <span>60</span>
               <span>120</span>
@@ -257,12 +257,12 @@ export function SleepLogForm() {
       </div>
 
       <label className="flex flex-col gap-3 text-sm group">
-        <span className="font-medium text-zinc-200 flex items-center gap-2">
-          📝 Notes <span className="text-xs text-zinc-500 font-normal">(optional)</span>
+        <span className="font-medium text-slate-200 flex items-center gap-2">
+          📝 Notes <span className="text-xs text-slate-500 font-normal">(optional)</span>
         </span>
         <textarea 
           rows={3} 
-          className="bg-zinc-800/80 border border-zinc-600/50 p-3 rounded-xl resize-y transition-all duration-200 focus:border-violet-400 focus:bg-zinc-800 focus:ring-2 focus:ring-violet-400/20 focus:outline-none" 
+          className="bg-slate-800/80 border border-slate-600/50 p-3 rounded-xl resize-y transition-all duration-200 focus:border-indigo-400 focus:bg-slate-800 focus:ring-2 focus:ring-indigo-400/20 focus:outline-none" 
           value={notes} 
           onChange={e=>setNotes(e.target.value)} 
           placeholder="Illness, stressors, naps, exercise, etc." 
@@ -274,7 +274,7 @@ export function SleepLogForm() {
       <div className="flex flex-wrap items-center gap-3 pt-2">
         <button 
           disabled={!canSubmit} 
-          className="bg-gradient-to-r from-violet-600 to-emerald-600 disabled:from-zinc-600 disabled:to-zinc-600 disabled:cursor-not-allowed hover:from-violet-500 hover:to-emerald-500 px-6 py-3 rounded-xl text-sm font-medium transition-all duration-200 shadow-lg hover:shadow-xl disabled:shadow-none transform hover:scale-105 disabled:scale-100 flex items-center gap-2"
+          className="bg-gradient-to-r from-indigo-600 to-cyan-600 disabled:from-slate-600 disabled:to-slate-600 disabled:cursor-not-allowed hover:from-indigo-500 hover:to-cyan-500 px-6 py-3 rounded-xl text-sm font-medium transition-all duration-200 shadow-lg hover:shadow-xl disabled:shadow-none transform hover:scale-105 disabled:scale-100 flex items-center gap-2"
         >
           {saving ? (
             <>
@@ -290,7 +290,7 @@ export function SleepLogForm() {
         <button 
           type="button" 
           onClick={()=>{setBedtime("");setWake("");setAwaken(0);setCaffeine(false);setAlcohol(false);setScreen(0);setNotes("");setStatus({type:"idle"});}} 
-          className="text-sm text-zinc-400 hover:text-zinc-200 px-3 py-2 rounded-xl hover:bg-zinc-700/50 transition-all duration-200"
+          className="text-sm text-slate-400 hover:text-slate-200 px-3 py-2 rounded-xl hover:bg-slate-700/50 transition-all duration-200"
         >
           🔄 Reset
         </button>
@@ -298,14 +298,14 @@ export function SleepLogForm() {
           <button 
             type="button" 
             onClick={restoreDraft} 
-            className="text-sm text-emerald-400 hover:text-emerald-300 px-3 py-2 rounded-xl hover:bg-emerald-400/10 transition-all duration-200 border border-emerald-400/20"
+            className="text-sm text-cyan-400 hover:text-cyan-300 px-3 py-2 rounded-xl hover:bg-cyan-400/10 transition-all duration-200 border border-cyan-400/20"
           >
             📋 Restore draft
           </button>
         )}
         <div id="sleep-form-status" aria-live="polite" className="text-sm font-medium">
           {status.type === "success" && (
-            <div className="flex items-center gap-2 text-emerald-400 bg-emerald-400/10 px-3 py-2 rounded-xl border border-emerald-400/20">
+            <div className="flex items-center gap-2 text-cyan-400 bg-cyan-400/10 px-3 py-2 rounded-xl border border-cyan-400/20">
               ✅ {status.msg}
             </div>
           )}
