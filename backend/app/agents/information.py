@@ -1,66 +1,38 @@
-from typing import Optional, Dict, List
+from typing import Optional
 from . import BaseAgent, AgentContext, AgentResponse
-
-# Tiny curated KB. You can expand this (or replace with your own vector search later).
-KB: Dict[str, Dict[str, List[str] | str]] = {
-    "caffeine": {
-        "bullets": [
-            "Caffeine can delay sleep and reduce deep sleep.",
-            "Avoid caffeine **within 6–8 hours** of bedtime; many people choose after **3 pm** cut-off.",
-        ],
-        "sources": [
-            "CDC: Sleep and Caffeine — https://www.cdc.gov/sleep/",
-            "NIH MedlinePlus: Caffeine — https://medlineplus.gov/caffeine.html",
-        ],
-    },
-    "screens": {
-        "bullets": [
-            "Bright light and engaging content close to bedtime can delay sleep onset.",
-            "Try **60–90 min screen-free** wind-down; dim lights, use night-shift if needed.",
-        ],
-        "sources": [
-            "NIH: Light exposure and sleep — https://www.nih.gov/",
-            "AASM (sleep experts): Sleep hygiene tips — https://sleepeducation.org/",
-        ],
-    },
-    "schedule": {
-        "bullets": [
-            "A **consistent wake-up time** is the strongest anchor for circadian rhythm.",
-            "Gradually shift by **15–30 min** every few nights if you need to move your schedule.",
-        ],
-        "sources": [
-            "CDC: Healthy Sleep — https://www.cdc.gov/sleep/",
-            "NIH: Circadian Rhythm — https://www.nigms.nih.gov/education/fact-sheets/Pages/circadian-rhythms.aspx",
-        ],
-    },
-    "naps": {
-        "bullets": [
-            "Short naps (~10–20 min) can be refreshing; avoid late-day naps if they harm night sleep.",
-        ],
-        "sources": [
-            "NIH: Napping — https://www.nih.gov/",
-        ],
-    },
-}
-
-def _match_topic(message: str) -> str:
-    t = message.lower()
-    if "caff" in t or "coffee" in t: return "caffeine"
-    if "screen" in t or "phone" in t or "blue light" in t: return "screens"
-    if "schedule" in t or "bedtime" in t or "wake" in t: return "schedule"
-    if "nap" in t: return "naps"
-    return "schedule"
+from app.llm_gemini import generate_gemini_text
+from app.schemas import InfoResponse, AgentResponseModel
 
 class InformationAgent(BaseAgent):
     """
-    Evidence-based librarian: short guidance + pointers to reputable sources.
+    Uses an LLM to answer general knowledge questions about sleep.
     """
     name = "information"
+    
+    def __init__(self):
+        super().__init__()
+        self.action_type = "general_response"  # For responsible AI transparency
 
-    async def handle(self, message: str, ctx: Optional[AgentContext] = None) -> AgentResponse:
-        topic = _match_topic(message)
-        card = KB.get(topic, KB["schedule"])
-        bullets = "\n".join(f"• {b}" for b in card["bullets"])  # type: ignore
-        sources = "\n".join(f"- {s}" for s in card["sources"])  # type: ignore
-        text = f"**{topic.title()} — key points**\n{bullets}\n\n**Sources**\n{sources}"
-        return {"agent": self.name, "text": text, "data": {"topic": topic}}
+    async def _handle_core(self, message: str, ctx: Optional[AgentContext] = None) -> AgentResponse:
+        prompt = f"""
+        You are a helpful sleep science explainer. Your goal is to answer the user's question clearly and concisely, based on general knowledge about sleep science.
+
+        - Keep your answer focused on the user's question.
+        - Use formatting like bullet points or bold text to make the information easy to digest.
+        - At the end of your response, ALWAYS include the disclaimer: "_This is for informational purposes and is not medical advice._"
+
+        User's question: "{message}"
+
+        Your answer:
+        """
+
+        response_text = await generate_gemini_text(prompt)
+
+        if not response_text:
+            response_text = "I'm sorry, I couldn't retrieve information on that topic at the moment. Please try asking in a different way."
+
+        # Validate response
+        info = InfoResponse(topic="general_inquiry", text=response_text)
+        resp = AgentResponseModel(agent=self.name, text=info.text, data={"topic": info.topic})
+        return resp.dict()
+
