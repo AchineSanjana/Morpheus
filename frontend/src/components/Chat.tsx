@@ -1,8 +1,15 @@
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { streamChat } from "../lib/api";
+import { ResponseAnalysis } from "./ResponsibleAI";
 
-type Msg = { role: "user" | "assistant"; content: string };
+type Msg = { 
+  role: "user" | "assistant"; 
+  content: string; 
+  responsibleAIChecks?: Record<string, any>;
+  responsibleAIPassed?: boolean;
+  responsibleAIRiskLevel?: string;
+};
 
 export function Chat() {
   const [msgs, setMsgs] = useState<Msg[]>([
@@ -104,19 +111,27 @@ export function Chat() {
                   : "bg-slate-800/80 border border-slate-700/50 text-slate-100 shadow-md"
               }`}>
                 {m.role === "assistant" ? (
-                  <div className="text-sm leading-relaxed">
-                    {m.content ? formatMessage(m.content) : (
-                      isAssistantTyping ? (
-                        <div className="flex items-center gap-2 text-slate-400">
-                          <div className="flex gap-1">
-                            <div className="w-2 h-2 bg-slate-400 rounded-full animate-pulse"></div>
-                            <div className="w-2 h-2 bg-slate-400 rounded-full animate-pulse [animation-delay:0.2s]"></div>
-                            <div className="w-2 h-2 bg-slate-400 rounded-full animate-pulse [animation-delay:0.4s]"></div>
+                  <div>
+                    <div className="text-sm leading-relaxed">
+                      {m.content ? formatMessage(m.content) : (
+                        isAssistantTyping ? (
+                          <div className="flex items-center gap-2 text-slate-400">
+                            <div className="flex gap-1">
+                              <div className="w-2 h-2 bg-slate-400 rounded-full animate-pulse"></div>
+                              <div className="w-2 h-2 bg-slate-400 rounded-full animate-pulse [animation-delay:0.2s]"></div>
+                              <div className="w-2 h-2 bg-slate-400 rounded-full animate-pulse [animation-delay:0.4s]"></div>
+                            </div>
                           </div>
-                        </div>
-                      ) : (
-                        <span className="text-slate-500">...</span>
-                      )
+                        ) : (
+                          <span className="text-slate-500">...</span>
+                        )
+                      )}
+                    </div>
+                    {/* Show responsible AI analysis if available */}
+                    {m.content && m.responsibleAIChecks && (
+                      <div className="mt-3">
+                        <ResponseAnalysis responsibleAIChecks={m.responsibleAIChecks} />
+                      </div>
                     )}
                   </div>
                 ) : (

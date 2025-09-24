@@ -1,5 +1,6 @@
 ﻿# app/main.py
 import os, asyncio
+from datetime import datetime
 from fastapi import FastAPI, Header, HTTPException, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
@@ -347,3 +348,154 @@ async def clear_messages(authorization: str = Header(default="")):
 
     await run_in_threadpool(_delete)
     return {"ok": True}
+
+# ---------------------- RESPONSIBLE AI ENDPOINTS ----------------------
+
+@app.get("/responsible-ai/status")
+async def get_responsible_ai_status():
+    """Get the status of responsible AI features"""
+    try:
+        from app.responsible_ai import responsible_ai
+        return {
+            "enabled": True,
+            "version": "1.0.0",
+            "features": {
+                "fairness_checks": True,
+                "transparency_tracking": True,
+                "ethical_data_handling": True,
+                "bias_detection": True,
+                "inclusive_language": True
+            },
+            "status": "operational"
+        }
+    except ImportError:
+        return {
+            "enabled": False,
+            "error": "Responsible AI module not available"
+        }
+
+@app.post("/responsible-ai/validate")
+async def validate_responsible_ai(
+    payload: dict,
+    authorization: str = Header(default="")
+):
+    """Validate content against responsible AI guidelines"""
+    user = await get_current_user(authorization.replace("Bearer ", ""))
+    if not user:
+        raise HTTPException(401, "Unauthorized")
+    
+    try:
+        from app.responsible_ai import responsible_ai
+        
+        text = payload.get("text", "")
+        action_type = payload.get("action_type", "general_response")
+        user_context = payload.get("user_context", {})
+        data_sources = payload.get("data_sources", [])
+        decision_factors = payload.get("decision_factors", {})
+        
+        if not text:
+            raise HTTPException(400, "Text content is required")
+        
+        results = await responsible_ai.comprehensive_check(
+            text=text,
+            action_type=action_type,
+            user_context=user_context,
+            data_sources=data_sources,
+            decision_factors=decision_factors
+        )
+        
+        # Convert to serializable format
+        serialized_results = {}
+        for check_type, check_result in results.items():
+            serialized_results[check_type] = {
+                "passed": check_result.passed,
+                "risk_level": check_result.risk_level.value if hasattr(check_result.risk_level, 'value') else str(check_result.risk_level),
+                "category": check_result.category,
+                "message": check_result.message,
+                "suggestions": check_result.suggestions,
+                "metadata": check_result.metadata or {}
+            }
+        
+        return {
+            "validation_results": serialized_results,
+            "overall_passed": all(r["passed"] for r in serialized_results.values()),
+            "timestamp": datetime.now().isoformat()
+        }
+        
+    except ImportError:
+        raise HTTPException(503, "Responsible AI validation service not available")
+    except Exception as e:
+        raise HTTPException(500, f"Validation error: {str(e)}")
+
+@app.get("/responsible-ai/guidelines")
+async def get_responsible_ai_guidelines():
+    """Get responsible AI guidelines and best practices"""
+    return {
+        "fairness": {
+            "principle": "Ensure AI responses are fair and unbiased across all user demographics",
+            "guidelines": [
+                "Use inclusive language that considers diverse backgrounds",
+                "Avoid stereotyping based on age, gender, culture, or socioeconomic status",
+                "Provide alternatives for users with different abilities",
+                "Offer both free and accessible solutions alongside premium options",
+                "Acknowledge individual differences in responses"
+            ],
+            "examples": {
+                "good": "Consider gentle exercises that work within your current abilities",
+                "bad": "Just do these exercises - they're easy for everyone"
+            }
+        },
+        "transparency": {
+            "principle": "Be transparent about AI decision-making and data usage",
+            "guidelines": [
+                "Explain how recommendations were generated",
+                "Disclose what data sources were used",
+                "Acknowledge AI limitations and uncertainty",
+                "Clearly identify AI-generated content",
+                "Mention when human professional help is recommended"
+            ],
+            "examples": {
+                "good": "Based on your 7 nights of sleep data, I noticed your bedtime varies by 2+ hours...",
+                "bad": "You should change your bedtime routine"
+            }
+        },
+        "ethical_data_handling": {
+            "principle": "Protect user privacy and handle data ethically",
+            "guidelines": [
+                "Minimize data collection to essential sleep-related information",
+                "Protect sensitive personal information",
+                "Inform users about their data rights",
+                "Ensure data security and confidentiality",
+                "Obtain appropriate consent for data usage"
+            ],
+            "examples": {
+                "good": "Your sleep data is securely stored and you can delete it anytime",
+                "bad": "Sharing personal medical details in responses"
+            }
+        }
+    }
+
+@app.get("/responsible-ai/audit-log")
+async def get_responsible_ai_audit_log(
+    limit: int = Query(default=50, le=200),
+    authorization: str = Header(default="")
+):
+    """Get audit log of responsible AI checks (admin only)"""
+    user = await get_current_user(authorization.replace("Bearer ", ""))
+    if not user:
+        raise HTTPException(401, "Unauthorized")
+    
+    # This would typically check for admin privileges
+    # For now, we'll return a mock audit log structure
+    return {
+        "message": "Audit logging would be implemented with proper admin authentication",
+        "structure": {
+            "timestamp": "ISO datetime",
+            "user_id": "User identifier",
+            "agent": "Which agent was used",
+            "check_results": "Responsible AI check results",
+            "risk_level": "Overall risk assessment",
+            "action_taken": "Any corrective actions"
+        },
+        "note": "Full audit logging requires additional security and storage infrastructure"
+    }

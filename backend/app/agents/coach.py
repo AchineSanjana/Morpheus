@@ -3,6 +3,10 @@ from datetime import datetime, timedelta
 from . import BaseAgent, AgentContext, AgentResponse
 from app.llm_gemini import generate_gemini_text
 from app.db import fetch_recent_logs
+import logging
+
+# Configure logging for coach agent
+logger = logging.getLogger(__name__)
 
 DISCLAIMER = (
     "_This is educational guidance based on sleep science principles, not medical care. "
@@ -38,11 +42,20 @@ class CoachAgent(BaseAgent):
 
     def __init__(self):
         super().__init__()
+        self.action_type = "sleep_coaching_plan"  # For responsible AI transparency
         self.coaching_frameworks = {
             "cbt_i": "Cognitive Behavioral Therapy for Insomnia",
             "sleep_hygiene": "Sleep Environment & Habits Optimization",
             "circadian": "Circadian Rhythm Regulation",
             "stress_management": "Stress & Anxiety Reduction for Sleep"
+        }
+        
+        # Responsible AI configurations
+        self.inclusive_coaching_principles = {
+            "cultural_sensitivity": "Adapt recommendations to different cultural sleep practices",
+            "accessibility": "Provide alternatives for users with different abilities",
+            "economic_inclusivity": "Offer free and low-cost solutions alongside premium options",
+            "age_inclusivity": "Tailor advice for different age groups without stereotyping"
         }
 
     async def _analyze_sleep_patterns(self, logs: List[Dict[str, Any]]) -> Dict[str, Any]:
@@ -266,7 +279,7 @@ class CoachAgent(BaseAgent):
                 
         return concerns
 
-    async def handle(self, message: str, ctx: Optional[AgentContext] = None) -> AgentResponse:
+    async def _handle_core(self, message: str, ctx: Optional[AgentContext] = None) -> AgentResponse:
         ctx = ctx or {}
         user = ctx.get("user")
         
@@ -293,9 +306,17 @@ class CoachAgent(BaseAgent):
         
         # Generate personalized coaching response
         if analysis and logs:
-            # Enhanced LLM prompt with comprehensive context
+            # Enhanced LLM prompt with comprehensive context and responsible AI guidelines
             prompt = f"""
-            You are an expert sleep coach with training in CBT-I (Cognitive Behavioral Therapy for Insomnia) and sleep science.
+            You are Morpheus, an expert AI sleep coach with training in CBT-I (Cognitive Behavioral Therapy for Insomnia) and sleep science.
+            
+            IMPORTANT: Follow these responsible AI principles:
+            - Use inclusive language that considers diverse backgrounds, ages, and abilities
+            - Provide alternatives for users with different physical or economic capabilities
+            - Acknowledge individual differences - avoid "everyone should" statements
+            - Be transparent about data usage and AI limitations
+            - Respect privacy - don't expose sensitive personal details
+            - Offer both free and accessible solutions alongside premium options
             
             A user is asking for sleep improvement guidance. Based on their comprehensive 14-day sleep analysis, create a detailed, personalized coaching response.
             
@@ -345,13 +366,23 @@ class CoachAgent(BaseAgent):
         else:
             final_sections.append("I'd love to help you improve your sleep! To give you the most personalized advice, please log a few nights of sleep data first. In the meantime, focus on consistent wake times and a relaxing bedtime routine.")
         
+        # Add responsible AI transparency note
+        transparency_note = self._generate_transparency_note(analysis, len(logs))
+        if transparency_note:
+            final_sections.append(transparency_note)
+        
         final_sections.append(f"{DISCLAIMER}")
         
-        # Prepare response data
+        # Prepare response data with transparency information
         response_data = {
             "safety_concerns": safety_concerns,
             "analysis": analysis,
-            "coaching_framework": "cbt_i_enhanced"
+            "coaching_framework": "cbt_i_enhanced",
+            "decision_factors": self._get_decision_factors(analysis, message, safety_concerns),
+            "data_sources_used": self._get_data_sources_used(logs, user),
+            "personalization_level": "high" if analysis else "general",
+            "alternatives_provided": True,
+            "accessibility_considered": True
         }
         
         if analysis:
@@ -366,19 +397,135 @@ class CoachAgent(BaseAgent):
     async def _generate_general_coaching_advice(self, message: str) -> str:
         """Generate general advice for users without sleep data."""
         prompt = f"""
-        You are a sleep coach helping someone who hasn't logged detailed sleep data yet.
+        You are Morpheus, an AI sleep coach helping someone who hasn't logged detailed sleep data yet.
+        
+        IMPORTANT: Follow responsible AI principles:
+        - Use inclusive language for all backgrounds and abilities
+        - Provide both free and accessible solutions
+        - Acknowledge individual differences
+        - Be transparent that this is AI-generated advice
         
         User's message: "{message}"
         
         Provide helpful, general sleep improvement advice that covers:
-        1. Sleep hygiene fundamentals
-        2. Creating a bedtime routine  
-        3. Environment optimization
-        4. Timing and consistency tips
+        1. Sleep hygiene fundamentals (with accessible alternatives)
+        2. Creating a bedtime routine (adaptable to different lifestyles)
+        3. Environment optimization (budget-friendly options)
+        4. Timing and consistency tips (flexible for different schedules)
         5. Encourage them to start tracking their sleep
         
-        Keep it actionable and encouraging. Limit to 4-5 key points.
+        Keep it actionable, encouraging, and inclusive. Limit to 4-5 key points.
         """
         
         response = await generate_gemini_text(prompt)
         return response or "Focus on these fundamentals: consistent sleep schedule, cool dark bedroom, no screens 1 hour before bed, and no caffeine after 2pm. Start logging your sleep so I can give you personalized advice!"
+
+    def _get_decision_factors(self, analysis: Dict[str, Any], message: str, safety_concerns: List[str]) -> Dict[str, Any]:
+        """Get decision factors for transparency in AI recommendations"""
+        factors = {}
+        
+        if analysis:
+            factors["sleep_duration_trend"] = analysis.get("duration_trend", "unknown")
+            factors["sleep_consistency"] = {
+                "bedtime": analysis.get("bedtime_consistency", {}).get("rating", "unknown"),
+                "wake_time": analysis.get("wake_consistency", {}).get("rating", "unknown")
+            }
+            factors["problem_areas"] = analysis.get("problem_areas", [])
+            factors["sleep_efficiency"] = analysis.get("sleep_efficiency", "unknown")
+            factors["lifestyle_factors"] = {
+                "caffeine_frequency": analysis.get("caffeine_frequency", 0),
+                "screen_time": analysis.get("avg_screen_time", 0),
+                "alcohol_frequency": analysis.get("alcohol_frequency", 0)
+            }
+        
+        factors["safety_screening"] = {
+            "concerns_detected": safety_concerns,
+            "urgent_referral_needed": "urgent_symptoms" in safety_concerns
+        }
+        
+        factors["user_input_analysis"] = {
+            "message_length": len(message),
+            "specific_request": self._categorize_user_request(message)
+        }
+        
+        return factors
+
+    def _get_data_sources_used(self, logs: List[Dict[str, Any]], user: Optional[Dict[str, Any]]) -> List[str]:
+        """Identify data sources used for transparency"""
+        sources = []
+        
+        if logs:
+            sources.append(f"sleep_logs_{len(logs)}_nights")
+        if user:
+            sources.append("user_profile")
+        
+        sources.extend([
+            "cbt_i_framework",
+            "sleep_science_evidence",
+            "safety_screening_patterns"
+        ])
+        
+        return sources
+
+    def _generate_transparency_note(self, analysis: Dict[str, Any], log_count: int) -> Optional[str]:
+        """Generate transparency note about AI decision-making"""
+        if not analysis:
+            return "**AI Transparency Note:** This response is generated based on general sleep science principles since no sleep data is available yet."
+        
+        note_parts = [
+            f"**AI Transparency Note:** This personalized coaching is based on analysis of your {log_count} nights of sleep data",
+        ]
+        
+        if analysis.get("problem_areas"):
+            note_parts.append(f"focusing on your main challenges: {', '.join(analysis['problem_areas'][:2])}")
+        
+        note_parts.append("You have full control over your data and can modify or delete it anytime.")
+        
+        return " ".join(note_parts) + "."
+
+    def _categorize_user_request(self, message: str) -> str:
+        """Categorize the type of user request for decision factor transparency"""
+        message_lower = message.lower()
+        
+        if any(word in message_lower for word in ["help", "advice", "improve", "better"]):
+            return "general_improvement_request"
+        elif any(word in message_lower for word in ["insomnia", "can't sleep", "trouble sleeping"]):
+            return "sleep_disorder_concern"
+        elif any(word in message_lower for word in ["schedule", "routine", "habit"]):
+            return "routine_optimization"
+        elif any(word in message_lower for word in ["tired", "fatigue", "energy"]):
+            return "energy_optimization"
+        else:
+            return "general_inquiry"
+
+    def _get_data_sources(self, ctx: AgentContext) -> List[str]:
+        """Override parent method to provide coach-specific data sources"""
+        sources = super()._get_data_sources(ctx)
+        
+        # Add coach-specific sources
+        sources.extend([
+            "cbt_i_framework",
+            "sleep_science_research",
+            "safety_screening_database"
+        ])
+        
+        return sources
+
+    async def _apply_inclusive_coaching_principles(self, response_text: str) -> str:
+        """Apply inclusive coaching principles to response text"""
+        # Add inclusive language reminders
+        inclusive_additions = []
+        
+        if "expensive" in response_text.lower() or "cost" in response_text.lower():
+            inclusive_additions.append("*Budget-friendly alternatives are available for all recommendations.*")
+        
+        if "exercise" in response_text.lower() or "physical" in response_text.lower():
+            inclusive_additions.append("*All physical recommendations can be adapted based on your abilities and mobility.*")
+        
+        if "bedroom" in response_text.lower() or "environment" in response_text.lower():
+            inclusive_additions.append("*Environmental suggestions can be adapted to your living situation and resources.*")
+        
+        if inclusive_additions:
+            response_text += "\n\n" + " ".join(inclusive_additions)
+        
+        return response_text

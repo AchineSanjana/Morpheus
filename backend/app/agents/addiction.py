@@ -49,6 +49,10 @@ class AddictionAgent(BaseAgent):
     Enhanced with severity assessment, personalized plans, and sleep correlation analysis.
     """
     name = "addiction"
+    
+    def __init__(self):
+        super().__init__()
+        self.action_type = "behavioral_change_suggestion"  # For responsible AI transparency
 
     def _detect_addiction_context(self, message: str) -> bool:
         """Check if user message contains addiction-related triggers."""
@@ -263,7 +267,7 @@ class AddictionAgent(BaseAgent):
             return "\n\n💭 **Follow-up:** How are you feeling about your alcohol reduction goals?"
         return ""
 
-    async def handle(self, message: str, ctx: Optional[AgentContext] = None) -> AgentResponse:
+    async def _handle_core(self, message: str, ctx: Optional[AgentContext] = None) -> AgentResponse:
         """Handle addiction-related queries with enhanced intelligence and personalization."""
         ctx = ctx or {}
         user = ctx.get("user")

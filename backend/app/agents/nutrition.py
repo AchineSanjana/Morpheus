@@ -15,8 +15,12 @@ class NutritionAgent(BaseAgent):
     Tracks patterns in recent logs and explains how they may affect sleep.
     """
     name = "nutrition"
+    
+    def __init__(self):
+        super().__init__()
+        self.action_type = "personalized_recommendation"  # For responsible AI transparency
 
-    async def handle(self, message: str, ctx: Optional[AgentContext] = None) -> AgentResponse:
+    async def _handle_core(self, message: str, ctx: Optional[AgentContext] = None) -> AgentResponse:
         ctx = ctx or {}
         user = ctx.get("user")
         if not user:

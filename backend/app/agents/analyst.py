@@ -26,6 +26,10 @@ class AnalyticsAgent(BaseAgent):
     with trends, insights, and actionable recommendations.
     """
     name = "analytics"
+    
+    def __init__(self):
+        super().__init__()
+        self.action_type = "data_analysis"  # For responsible AI transparency
 
     def _calculate_trend(self, values: List[float]) -> str:
         """Calculate if values are improving, worsening, or stable."""
@@ -178,7 +182,7 @@ class AnalyticsAgent(BaseAgent):
         
         return "; ".join(trends) if trends else "Sleep patterns are relatively stable"
 
-    async def handle(self, message: str, ctx: Optional[AgentContext] = None) -> AgentResponse:
+    async def _handle_core(self, message: str, ctx: Optional[AgentContext] = None) -> AgentResponse:
         """Generate comprehensive 7-day sleep analytics with trends and insights."""
         ctx = ctx or {}
         user = ctx.get("user")

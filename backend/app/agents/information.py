@@ -8,8 +8,12 @@ class InformationAgent(BaseAgent):
     Uses an LLM to answer general knowledge questions about sleep.
     """
     name = "information"
+    
+    def __init__(self):
+        super().__init__()
+        self.action_type = "general_response"  # For responsible AI transparency
 
-    async def handle(self, message: str, ctx: Optional[AgentContext] = None) -> AgentResponse:
+    async def _handle_core(self, message: str, ctx: Optional[AgentContext] = None) -> AgentResponse:
         prompt = f"""
         You are a helpful sleep science explainer. Your goal is to answer the user's question clearly and concisely, based on general knowledge about sleep science.
 

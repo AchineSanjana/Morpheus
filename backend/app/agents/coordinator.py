@@ -19,6 +19,8 @@ class CoordinatorAgent(BaseAgent):
     name = "coordinator"
 
     def __init__(self) -> None:
+        super().__init__()
+        self.action_type = "request_routing"  # For responsible AI transparency
         self.analyst = AnalyticsAgent()
         self.coach = CoachAgent()
         self.nutrition = NutritionAgent() #Amath
@@ -71,7 +73,7 @@ class CoordinatorAgent(BaseAgent):
             return None
         return None
 
-    async def handle(self, message: str, ctx: Optional[AgentContext] = None) -> AgentResponse:
+    async def _handle_core(self, message: str, ctx: Optional[AgentContext] = None) -> AgentResponse:
         ctx = ctx or {}
         user = ctx.get("user")
 
