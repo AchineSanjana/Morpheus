@@ -18,7 +18,7 @@ def gemini_ready() -> bool:
     """Return True when the Gemini API key is configured and client is usable."""
     return bool(api_key and genai)
 
-async def generate_gemini_text(prompt: str, model_name: str = "gemini-1.5-flash-latest") -> Optional[str]:
+async def generate_gemini_text(prompt: str, model_name: str = "gemini-1.5-flash-8b") -> Optional[str]:
     """
     Generates text using the Gemini API. Returns None if the API key is not set or an error occurs.
     """

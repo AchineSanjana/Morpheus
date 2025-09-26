@@ -17,7 +17,7 @@ WELCOME_MENU = [
     "• Tell me a bedtime story",
 ]
 
-_ALLOWED = {"analytics", "coach", "information", "storyteller"}
+_ALLOWED = {"analytics", "coach", "information", "storyteller", "addiction"}
 
 class CoordinatorAgent(BaseAgent):
     name = "coordinator"
@@ -41,6 +41,9 @@ class CoordinatorAgent(BaseAgent):
             return "coach"
         if any(k in t for k in ["caffeine", "coffee", "screen", "explain", "what is", "define", "tell me about"]):
             return "information"
+        # Add addiction detection
+        if any(k in t for k in ["addict", "dependen", "craving", "alcohol", "nicotine", "smoking", "drinking", "quit", "stop", "withdrawal", "too much coffee", "too much alcohol"]):
+            return "addiction"
         return "coach"  # default: help them with advice
 
     async def _intent_llm(self, message: str) -> Optional[str]:
@@ -56,13 +59,14 @@ class CoordinatorAgent(BaseAgent):
             "- analytics: analyze past sleep data, trends, summaries, reports\n"
             "- coach: give advice, plans, tips, how to improve sleep\n"
             "- information: factual info/definitions about sleep topics (caffeine, alcohol, screens, etc.)\n"
+            "- addiction: help with addiction/dependency issues (caffeine, alcohol, nicotine, digital)\n"
             "- storyteller: tell a calming, short bedtime story\n\n"
             f"User message: \"{message}\"\n\n"
-            "Respond with just one word: analytics, coach, information, or storyteller."
+            "Respond with just one word: analytics, coach, information, addiction, or storyteller."
         )
 
         try:
-            raw = await generate_gemini_text(prompt, model_name="gemini-1.5-flash") or ""
+            raw = await generate_gemini_text(prompt, model_name="gemini-1.5-flash-8b") or ""
         except Exception:
             return None
 
@@ -93,6 +97,10 @@ class CoordinatorAgent(BaseAgent):
             )
             return {"agent": self.name, "text": text}
 
+        # Check if this is an addiction-related query first
+        if self.addiction._detect_addiction_context(message):
+            return await self.addiction.handle(message, ctx)
+
         # 1) Try LLM for intent; 2) fallback to keywords
         intent = await self._intent_llm(message) or self._intent_keyword(message)
 
@@ -113,6 +121,9 @@ class CoordinatorAgent(BaseAgent):
 
         if intent == "storyteller":
             return await self.story.handle(message, ctx)
+
+        if intent == "addiction":
+            return await self.addiction.handle(message, ctx)
 
         # Default safety: coach
         return await self.coach.handle(message, ctx)
