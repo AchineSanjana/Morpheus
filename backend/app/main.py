@@ -3,9 +3,9 @@ load_dotenv()  # load backend/.env before importing anything that uses env vars
 # app/main.py
 import os, asyncio
 from datetime import datetime
-from fastapi import FastAPI, Header, HTTPException, File, UploadFile
+from fastapi import FastAPI, Header, HTTPException, File, UploadFile, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, JSONResponse
 from .schemas import ChatRequest, SleepLogIn
 from .db import get_current_user, insert_sleep_log, supabase
 from starlette.concurrency import run_in_threadpool
@@ -14,12 +14,19 @@ from starlette.concurrency import run_in_threadpool
 from app.agents.coordinator import CoordinatorAgent
 from app.agents import AgentContext
 
+# Security imports
+from app.security_middleware import security_middleware, add_security_headers, rate_limit_error_handler
+from app.security_config import security_config
+
 from typing import Optional, List
 from fastapi import Query
 import uuid
 from pathlib import Path
 
 app = FastAPI(title="Morpheus API")
+
+# Security middleware - add before CORS
+app.middleware("http")(add_security_headers)
 
 # CORS for your Vite frontend
 origins = [os.getenv("CORS_ORIGINS", "http://localhost:5173")]
@@ -30,6 +37,11 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Security exception handlers
+@app.exception_handler(429)
+async def rate_limit_handler(request: Request, exc: HTTPException):
+    return rate_limit_error_handler(request, exc)
 
 # instantiate agents once (cheap)
 coordinator = CoordinatorAgent()
@@ -261,7 +273,10 @@ async def _coordinator_reply(message: str, user: dict) -> dict:
     return await coordinator.handle(message, ctx)
 
 @app.post("/chat/stream")
-async def chat_stream(req: ChatRequest, authorization: str = Header(default="")):
+async def chat_stream(request: Request, req: ChatRequest, authorization: str = Header(default="")):
+    # Security validation
+    await security_middleware.validate_request_security(request, req.message or "")
+    
     user = await get_current_user(authorization.replace("Bearer ", ""))
     if not user:
         raise HTTPException(401, "Unauthorized")

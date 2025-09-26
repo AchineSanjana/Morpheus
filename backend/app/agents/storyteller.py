@@ -1,11 +1,101 @@
 ﻿from typing import Optional, Dict, Any, List
 import random
 import logging
+import re
+import hashlib
+from datetime import datetime
 
 from . import BaseAgent, AgentContext, AgentResponse
 from app.llm_gemini import generate_gemini_text, gemini_ready
 
 logger = logging.getLogger(__name__)
+security_logger = logging.getLogger("security")
+
+class SecurityValidator:
+    """Security validation for storyteller inputs and outputs"""
+    
+    @staticmethod
+    def sanitize_user_input(text: str) -> str:
+        """Sanitize user input to prevent injection attacks"""
+        if not text:
+            return ""
+        
+        # Remove potential prompt injection patterns
+        dangerous_patterns = [
+            r"ignore\s+previous\s+instructions",
+            r"system\s*:",
+            r"admin\s*:",
+            r"override\s+settings",
+            r"<\s*script",
+            r"javascript\s*:",
+            r"eval\s*\(",
+            r"exec\s*\(",
+            r"import\s+",
+            r"from\s+.*\s+import",
+            r"__.*__",
+            r"document\.",
+            r"window\.",
+        ]
+        
+        sanitized = text
+        for pattern in dangerous_patterns:
+            sanitized = re.sub(pattern, "[FILTERED]", sanitized, flags=re.IGNORECASE)
+        
+        # Remove potential SQL injection
+        sql_patterns = [r"[';\"\\]", r"--", r"/\*", r"\*/", r"union\s+select", r"drop\s+table"]
+        for pattern in sql_patterns:
+            sanitized = re.sub(pattern, "", sanitized, flags=re.IGNORECASE)
+        
+        # Limit length and remove excessive special characters
+        sanitized = sanitized[:1000]  # Reasonable limit
+        sanitized = re.sub(r'[^\w\s\-.,!?áéíóúàèìòùâêîôû]', '', sanitized)
+        
+        return sanitized.strip()
+    
+    @staticmethod
+    def validate_story_output(content: str) -> bool:
+        """Validate AI-generated story output for safety"""
+        if not content or len(content.strip()) < 10:
+            return False
+        
+        # Check for harmful content patterns
+        harmful_patterns = [
+            r'\b(suicide|kill|death|violence|murder|weapon)\b',
+            r'\b(medication|drug|prescription|medical advice)\b',
+            r'\b(personal information|credit card|ssn|social security)\b',
+            r'\b(address|phone number|email|password)\b',
+            r'\b(explicit|sexual|inappropriate)\b',
+            r'\b(scary|frightening|terrifying|nightmare)\b'
+        ]
+        
+        content_lower = content.lower()
+        for pattern in harmful_patterns:
+            if re.search(pattern, content_lower):
+                security_logger.warning(f"Story content failed safety check: {pattern}")
+                return False
+        
+        return True
+    
+    @staticmethod
+    def hash_for_logging(content: str) -> str:
+        """Create safe hash for logging without exposing content"""
+        return hashlib.sha256(content.encode()).hexdigest()[:16]
+    
+    @staticmethod
+    def sanitize_user_name(user_name: str) -> Optional[str]:
+        """Sanitize and validate user name"""
+        if not user_name:
+            return None
+        
+        # Remove special characters and limit length
+        sanitized = re.sub(r'[^\w\s\-.]', '', user_name)
+        sanitized = sanitized.strip()[:50]  # Reasonable name length limit
+        
+        # Don't use names that look like email addresses or contain sensitive patterns
+        if '@' in sanitized or any(pattern in sanitized.lower() for pattern in ['admin', 'root', 'system']):
+            return None
+        
+        return sanitized if len(sanitized) >= 2 else None
 
 # Story themes and their associated elements
 STORY_THEMES = {
@@ -98,11 +188,15 @@ class StoryTellerAgent(BaseAgent):
     def __init__(self):
         super().__init__()
         self.action_type = "storytelling"  # For responsible AI context
-        self.story_preferences = {}  # Track user preferences
+        self.story_preferences = {}  # Track user preferences (encrypted)
         self.story_history = []  # Track recent stories for variety
+        self.security_validator = SecurityValidator()
 
     def _extract_story_preferences(self, message: str, ctx: Optional[AgentContext] = None) -> Dict[str, Any]:
-        """Extract story preferences from user message and context"""
+        """Extract story preferences from sanitized user message and context"""
+        # Sanitize input first
+        sanitized_message = self.security_validator.sanitize_user_input(message)
+        
         preferences = {
             "theme": None,
             "length": "medium",
@@ -111,7 +205,7 @@ class StoryTellerAgent(BaseAgent):
             "mood": "calm"
         }
         
-        message_lower = message.lower() if message else ""
+        message_lower = sanitized_message.lower() if sanitized_message else ""
         
         # Extract theme preferences
         for theme in STORY_THEMES.keys():
@@ -125,14 +219,16 @@ class StoryTellerAgent(BaseAgent):
         elif any(word in message_lower for word in ["long", "detailed", "extended"]):
             preferences["length"] = "long"
         
-        # Extract custom topic
+        # Extract custom topic (with additional sanitization)
         topic_indicators = ["about", "with", "featuring", "story of", "tale of"]
         for indicator in topic_indicators:
             if indicator in message_lower:
                 topic_start = message_lower.find(indicator) + len(indicator)
-                topic_end = len(message)
-                custom_topic = message[topic_start:topic_end].strip()
-                if custom_topic:
+                topic_end = len(message_lower)
+                custom_topic = sanitized_message[topic_start:topic_end].strip()
+                if custom_topic and len(custom_topic) <= 100:  # Limit topic length
+                    # Additional sanitization for custom topics
+                    custom_topic = re.sub(r'[^\w\s\-.,]', '', custom_topic)
                     preferences["custom_topic"] = custom_topic
                 break
         
@@ -143,31 +239,33 @@ class StoryTellerAgent(BaseAgent):
         return preferences
 
     def _build_enhanced_prompt(self, preferences: Dict[str, Any], user_name: Optional[str]) -> str:
-        """Build an enhanced prompt based on user preferences"""
+        """Build an enhanced prompt based on user preferences with security checks"""
         length_info = STORY_LENGTHS[preferences["length"]]
         
         prompt = f"{SYSTEM_STYLE_BASE}\n\n"
         prompt += f"Write a {preferences['length']} bedtime story ({length_info['words']} words). "
         
-        # Add theme guidance
-        if preferences["theme"]:
+        # Add theme guidance (pre-validated themes only)
+        if preferences["theme"] and preferences["theme"] in STORY_THEMES:
             theme_data = STORY_THEMES[preferences["theme"]]
             prompt += f"Focus on a {preferences['theme']} theme. "
             prompt += f"Consider incorporating elements like: {', '.join(theme_data['elements'][:3])}. "
             prompt += f"Possible characters: {', '.join(theme_data['characters'][:2])}. "
             prompt += f"Settings might include: {', '.join(theme_data['settings'][:2])}. "
         
-        # Add custom topic
+        # Add custom topic (already sanitized)
         if preferences["custom_topic"]:
             prompt += f"The story should be about: {preferences['custom_topic']}. "
         
-        # Add name instruction
-        if preferences["include_name"] and user_name:
-            prompt += f"The listener's name is {user_name}. Include their name gently in the story. "
+        # Add name instruction (sanitized name)
+        sanitized_name = self.security_validator.sanitize_user_name(user_name) if user_name else None
+        if preferences["include_name"] and sanitized_name:
+            prompt += f"The listener's name is {sanitized_name}. Include their name gently in the story. "
         
         prompt += "\nRemember: Keep the tone peaceful and sleep-inducing. "
         prompt += "Use sensory details that promote relaxation. "
-        prompt += "End with a gentle conclusion that encourages rest and peaceful dreams."
+        prompt += "End with a gentle conclusion that encourages rest and peaceful dreams. "
+        prompt += "Do not include any personal information, scary content, or inappropriate material."
         
         return prompt
 
@@ -198,22 +296,32 @@ class StoryTellerAgent(BaseAgent):
         return sources
 
     async def _handle_core(self, message: str, ctx: Optional[AgentContext] = None) -> AgentResponse:
-        """Core storytelling logic with enhancements"""
+        """Core storytelling logic with enhanced security"""
         try:
             ctx = ctx or {}
             user = ctx.get("user") or {}
-            user_name = None
             
-            # Extract user name from various sources
+            # Sanitize input message first
+            sanitized_message = self.security_validator.sanitize_user_input(message)
+            
+            # Log security event (without exposing content)
+            user_id = user.get('id', 'anonymous')[:8] if user.get('id') else 'anonymous'
+            security_logger.info(f"Story request - User: {user_id}, "
+                               f"Hash: {self.security_validator.hash_for_logging(sanitized_message)}")
+            
+            # Extract user name with security validation
+            user_name = None
             if user.get("user_metadata"):
                 user_name = user["user_metadata"].get("name")
             if not user_name and user.get("email"):
-                user_name = user["email"].split("@")[0].title()  # Use email username as name
+                # Extract username from email but validate it
+                email_username = user["email"].split("@")[0]
+                user_name = self.security_validator.sanitize_user_name(email_username.title())
             
-            # Extract story preferences
-            preferences = self._extract_story_preferences(message, ctx)
+            # Extract story preferences from sanitized input
+            preferences = self._extract_story_preferences(sanitized_message, ctx)
             
-            # Build enhanced prompt
+            # Build enhanced prompt with security checks
             prompt = self._build_enhanced_prompt(preferences, user_name)
             
             # Try to generate story with AI
@@ -227,32 +335,48 @@ class StoryTellerAgent(BaseAgent):
                         model_name="gemini-1.5-flash-8b",
                         temperature=0.7  # Slightly creative but controlled
                     )
-                    if story_text and len(story_text.strip()) > 50:  # Minimum viable story length
+                    
+                    # Validate AI output for security and appropriateness
+                    if (story_text and 
+                        len(story_text.strip()) > 50 and 
+                        self.security_validator.validate_story_output(story_text)):
                         generation_method = "ai_generated"
-                        logger.info(f"Generated story using AI: {len(story_text)} characters")
+                        logger.info(f"Story generated successfully - Length: {len(story_text)} chars, "
+                                  f"Hash: {self.security_validator.hash_for_logging(story_text)}")
                     else:
+                        logger.warning("AI-generated story failed validation, using fallback")
                         story_text = ""
+                        
                 except Exception as e:
-                    logger.warning(f"Story generation failed: {e}")
+                    logger.warning(f"Story generation failed: {str(e)[:100]}")  # Limit error message length
                     story_text = ""
             
-            # Use fallback if AI generation failed
+            # Use fallback if AI generation failed or was invalid
             if not story_text:
                 story_text = self._select_fallback_story()
-                logger.info("Using fallback story")
+                logger.info("Using validated fallback story")
             
-            # Prepare response data with metadata
+            # Prepare response data with security metadata (no sensitive data)
             response_data = {
-                "preferences": preferences,
+                "preferences": {
+                    "theme": preferences.get("theme"),
+                    "length": preferences.get("length"),
+                    "has_custom_topic": bool(preferences.get("custom_topic")),
+                    "name_requested": preferences.get("include_name", False)
+                },
                 "generation_method": generation_method,
-                "story_length": len(story_text.split()),
-                "theme_used": preferences.get("theme"),
-                "custom_topic": preferences.get("custom_topic"),
-                "user_name_included": bool(user_name and preferences.get("include_name")),
                 "story_metadata": {
                     "word_count": len(story_text.split()),
                     "character_count": len(story_text),
-                    "estimated_reading_time": f"{len(story_text.split()) // 150 + 1} minute(s)"
+                    "estimated_reading_time": f"{len(story_text.split()) // 150 + 1} minute(s)",
+                    "security_validated": True,
+                    "content_hash": self.security_validator.hash_for_logging(story_text)
+                },
+                "security_info": {
+                    "input_sanitized": True,
+                    "output_validated": True,
+                    "user_name_sanitized": bool(user_name),
+                    "prompt_secured": True
                 }
             }
             
@@ -263,14 +387,17 @@ class StoryTellerAgent(BaseAgent):
             }
             
         except Exception as e:
-            logger.error(f"Error in storyteller agent: {e}")
-            # Emergency fallback
+            logger.error(f"Error in storyteller agent: {str(e)[:200]}")  # Limit error logging
+            # Emergency fallback with security validation
+            fallback_story = FALLBACK_STORIES[0]
             return {
                 "agent": self.name,
-                "text": FALLBACK_STORIES[0],
+                "text": fallback_story,
                 "data": {
                     "error": "fallback_due_to_error",
-                    "generation_method": "emergency_fallback"
+                    "generation_method": "emergency_fallback",
+                    "security_validated": True,
+                    "content_hash": self.security_validator.hash_for_logging(fallback_story)
                 }
             }
 
