@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase, supabaseSession } from "../lib/supabaseClient";
 import morpheusLogo from "../assets/morpheus_logo.jpg";
+import PrivacyPolicy from "./PrivacyPolicy";
 
 export function Auth({ onAuthed }:{ onAuthed:()=>void }) {
   const [email,setEmail]=useState(""); 
@@ -10,6 +11,7 @@ export function Auth({ onAuthed }:{ onAuthed:()=>void }) {
   const [status, setStatus] = useState<{type:"idle"|"success"|"error";msg?:string}>({type:"idle"});
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
+  const [showPrivacy, setShowPrivacy] = useState(false);
 
   // Clear stored password when rememberMe is unchecked
   useEffect(() => {
@@ -311,7 +313,14 @@ export function Auth({ onAuthed }:{ onAuthed:()=>void }) {
               )}
             </p>
             <p className="text-xs text-slate-600 text-center mt-3">
-              By continuing, you agree to our Terms of Service and Privacy Policy
+              By continuing, you agree to our Terms of Service and
+              <button
+                type="button"
+                onClick={() => setShowPrivacy(true)}
+                className="ml-1 text-slate-300 hover:text-slate-200 underline"
+              >
+                Privacy Policy
+              </button>
             </p>
           </div>
         </div>
@@ -323,6 +332,26 @@ export function Auth({ onAuthed }:{ onAuthed:()=>void }) {
           </p>
         </div>
       </div>
+
+      {/* Privacy Policy Modal */}
+      {showPrivacy && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/70" onClick={() => setShowPrivacy(false)} />
+          <div className="relative bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl max-w-4xl w-[95%] max-h-[85vh] overflow-y-auto p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-slate-100">Privacy Policy</h3>
+              <button
+                onClick={() => setShowPrivacy(false)}
+                className="text-slate-400 hover:text-slate-200"
+                aria-label="Close privacy policy"
+              >
+                ✕
+              </button>
+            </div>
+            <PrivacyPolicy />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

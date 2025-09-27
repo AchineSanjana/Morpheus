@@ -487,6 +487,16 @@ async def assess_intervention_level(self, message: str, severity: str) -> Interv
     """
 ```
 
+### 7. Storyteller Agent - Safe Bedtime Content
+
+The Storyteller Agent generates bedtime stories with strict safety filters:
+- Input sanitization to block prompt injection and unsafe patterns
+- Output validation to remove age-inappropriate or medical/PII content
+- Token/length limits and calm tone guidance
+- Pre-approved fallback stories when validation fails or LLM is unavailable
+
+UX note: The app surfaces a privacy policy modal in both the main app and the auth screen, clarifying AI usage and data handling for story generation.
+
 ## Communication Flow Architecture
 
 ### Request Processing Flow

@@ -261,3 +261,5 @@ python -c "import jwt; print(jwt.decode(TOKEN, verify=False))"
 **💡 Remember**: Security is everyone's responsibility. When in doubt, err on the side of caution and contact the security team.
 
 *Last Updated: September 26, 2025 | Next Review: December 26, 2025*
+
+Update (Sep 27, 2025): Frontend includes an in-app Privacy Policy modal (`PrivacyPolicy.tsx`). Auth supports persistent vs session-only tokens via dual Supabase clients; verify CSP and storage policies during deployment.

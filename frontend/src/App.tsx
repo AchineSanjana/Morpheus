@@ -4,6 +4,7 @@ import { Auth } from "./components/Auth";
 import { SleepLogForm } from "./components/SleepLogForm";
 import { Chat } from "./components/Chat";
 import { Account } from "./components/Account";
+import PrivacyPolicy from "./components/PrivacyPolicy";
 import morpheusLogo from "./assets/morpheus_logo.jpg";
 import "./index.css";
 
@@ -11,6 +12,7 @@ export default function App() {
   const [authed,setAuthed]=useState(false);
   const [user, setUser] = useState<any>(null);
   const [showAccount, setShowAccount] = useState(false);
+  const [showPrivacy, setShowPrivacy] = useState(false);
 
   useEffect(()=>{
     // Subscribe to auth state changes for both clients (localStorage and sessionStorage clients)
@@ -103,6 +105,15 @@ export default function App() {
           <p className="text-xs text-slate-500 bg-slate-900/50 backdrop-blur-sm px-4 py-2 rounded-xl border border-slate-700/30">
             Not medical advice. If you have ongoing sleep issues, consult a clinician.
           </p>
+          <div className="mt-2">
+            <button
+              type="button"
+              onClick={() => setShowPrivacy(true)}
+              className="text-xs text-slate-400 hover:text-slate-200 underline"
+            >
+              Privacy Policy
+            </button>
+          </div>
         </div>
       </div>
       
@@ -112,6 +123,26 @@ export default function App() {
           user={user} 
           onClose={() => setShowAccount(false)} 
         />
+      )}
+
+      {/* Privacy Policy Modal */}
+      {showPrivacy && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/70" onClick={() => setShowPrivacy(false)} />
+          <div className="relative bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl max-w-4xl w-[95%] max-h-[85vh] overflow-y-auto p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-slate-100">Privacy Policy</h3>
+              <button
+                onClick={() => setShowPrivacy(false)}
+                className="text-slate-400 hover:text-slate-200"
+                aria-label="Close privacy policy"
+              >
+                ✕
+              </button>
+            </div>
+            <PrivacyPolicy />
+          </div>
+        </div>
       )}
     </div>
   );

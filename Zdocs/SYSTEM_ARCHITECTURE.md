@@ -162,10 +162,11 @@ src/
 │   ├── ResponsibleAI.tsx      // AI transparency & controls
 │   ├── Chat.tsx               // Main interaction interface
 │   ├── SleepLogForm.tsx       // Data input
-│   └── Account.tsx            // User management
+│   ├── Account.tsx            // User management
+│   └── PrivacyPolicy.tsx      // Privacy policy content (rendered in modals)
 ├── lib/
 │   ├── api.ts                 // Backend communication
-│   └── supabaseClient.ts      // Database client
+│   └── supabaseClient.ts      // Auth clients (localStorage and sessionStorage variants)
 └── assets/
     └── Morpheus_Logo.jpg      // Branding
 ```
@@ -325,9 +326,11 @@ async def generate_gemini_text(prompt: str) -> str:
 
 #### Supabase Platform Integration
 
-**Database Schema:**
+**Database Schema (illustrative):**
 ```sql
 -- User Management
+-- NOTE: In code and migrations, profile table may be referenced as `profiles` or `user_profile`.
+-- Ensure naming consistency in migrations and application queries.
 CREATE TABLE user_profile (
     id UUID PRIMARY KEY,
     full_name TEXT,

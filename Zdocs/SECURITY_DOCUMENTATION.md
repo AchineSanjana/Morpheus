@@ -1,7 +1,7 @@
 # 🔒 Morpheus Sleep AI - Security Documentation
 
 **Version**: 2.0  
-**Last Updated**: September 26, 2025  
+**Last Updated**: September 27, 2025  
 **Classification**: Internal  
 **Document Owner**: Security Team  
 
@@ -39,6 +39,8 @@ Morpheus Sleep AI is a secure, AI-powered bedtime storytelling application desig
 - ✅ Privacy-preserving data handling
 - ✅ Multi-layered content filtering
 - ✅ Real-time threat detection
+ - ✅ In-app Privacy Policy UI with clear disclosures
+ - ✅ Auth session stored via localStorage or sessionStorage based on user consent (Remember me)
 
 ---
 
@@ -285,6 +287,7 @@ SECURITY_HEADERS = {
     "Strict-Transport-Security": "max-age=31536000; includeSubDomains"
 }
 ```
+Note: In production behind a CDN or platform proxy, ensure HSTS is set at the edge and CSP is aligned with your frontend domain(s).
 
 #### **C. Rate Limiting**
 | Endpoint | Limit | Window | Burst |
@@ -292,6 +295,8 @@ SECURITY_HEADERS = {
 | /chat/stream | 20/hour | 1 hour | 5 |
 | /chat | 30/hour | 1 hour | 10 |
 | /auth | 10/hour | 1 hour | 3 |
+
+Implementation note: A simple in-memory limiter is suitable for development. For production, enable a Redis-backed limiter to apply limits consistently across replicas.
 
 ---
 

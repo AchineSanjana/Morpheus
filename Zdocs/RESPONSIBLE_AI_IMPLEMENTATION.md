@@ -58,6 +58,7 @@ This document outlines the comprehensive responsible AI implementation in the Mo
 - **ResponseAnalysis**: Shows responsible AI check results for each response
 - **DataControlPanel**: User data export and deletion controls
 - **Enhanced Privacy Notices**: Clear data usage and rights information
+ - **Privacy Policy Modal (`PrivacyPolicy.tsx`)**: Centralized disclosures about AI processing, data usage, retention, and rights; linked from auth and main UI.
 
 #### 2. Chat Integration (`Chat.tsx`)
 - **Response Metadata**: Displays responsible AI check results with each AI response

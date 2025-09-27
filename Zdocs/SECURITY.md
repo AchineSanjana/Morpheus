@@ -1,5 +1,7 @@
 # 🔒 Morpheus Sleep AI - Security Implementation Guide
 
+Status note (Sep 27, 2025): Frontend now includes an in-app Privacy Policy modal (`PrivacyPolicy.tsx`), and authentication supports both persistent (localStorage) and session-only (sessionStorage) tokens via dual Supabase clients. Ensure your CSP and cookie/storage policies reflect this behavior.
+
 ## ✅ **Security Features Implemented**
 
 ### **1. Input Security & Sanitization**
