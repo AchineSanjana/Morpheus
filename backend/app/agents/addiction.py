@@ -536,7 +536,7 @@ class AddictionAgent(BaseAgent):
         llm_response = ""
         if gemini_ready():
             try:
-                llm_response = await generate_gemini_text(prompt, model_name="gemini-1.5-flash-8b")
+                llm_response = await generate_gemini_text(prompt, model_name="gemini-2.0-flash-exp")
             except Exception as e:
                 print(f"Error calling Gemini API in addiction agent: {e}")
                 # Fallback response

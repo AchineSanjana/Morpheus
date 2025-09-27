@@ -66,7 +66,7 @@ class CoordinatorAgent(BaseAgent):
         )
 
         try:
-            raw = await generate_gemini_text(prompt, model_name="gemini-1.5-flash-8b") or ""
+            raw = await generate_gemini_text(prompt, model_name="gemini-2.0-flash-exp") or ""
         except Exception:
             return None
 

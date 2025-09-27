@@ -332,7 +332,7 @@ class StoryTellerAgent(BaseAgent):
                 try:
                     story_text = await generate_gemini_text(
                         prompt, 
-                        model_name="gemini-1.5-flash-8b",
+                        model_name="gemini-2.0-flash-exp",
                         temperature=0.7  # Slightly creative but controlled
                     )
                     
