@@ -119,11 +119,11 @@ async def chat_stream(request: Request, req: ChatRequest):
 ```
 
 ### **Rate Limits**
-| Endpoint | Limit | Window |
-|----------|-------|--------|
+| Endpoint       | Limit | Window |
+|----------      |-------|--------|
 | `/chat/stream` | 20/hour | Per IP |
-| `/chat` | 30/hour | Per IP |
-| `/auth` | 10/hour | Per IP |
+| `/chat`        | 30/hour | Per IP |
+| `/auth`        | 10/hour | Per IP |
 
 ---
 
