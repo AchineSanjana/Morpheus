@@ -309,14 +309,12 @@ class StoryTellerAgent(BaseAgent):
             security_logger.info(f"Story request - User: {user_id}, "
                                f"Hash: {self.security_validator.hash_for_logging(sanitized_message)}")
             
-            # Extract user name with security validation
+            # Extract user name with privacy protection - NO EMAIL EXTRACTION
             user_name = None
             if user.get("user_metadata"):
                 user_name = user["user_metadata"].get("name")
-            if not user_name and user.get("email"):
-                # Extract username from email but validate it
-                email_username = user["email"].split("@")[0]
-                user_name = self.security_validator.sanitize_user_name(email_username.title())
+            # REMOVED: Email-based name extraction to prevent email exposure
+            # Only use explicitly provided names from user metadata
             
             # Extract story preferences from sanitized input
             preferences = self._extract_story_preferences(sanitized_message, ctx)
@@ -332,8 +330,7 @@ class StoryTellerAgent(BaseAgent):
                 try:
                     story_text = await generate_gemini_text(
                         prompt, 
-                        model_name="gemini-2.0-flash-exp",
-                        temperature=0.7  # Slightly creative but controlled
+                        model_name="gemini-2.0-flash-exp"
                     )
                     
                     # Validate AI output for security and appropriateness
@@ -376,7 +373,8 @@ class StoryTellerAgent(BaseAgent):
                     "input_sanitized": True,
                     "output_validated": True,
                     "user_name_sanitized": bool(user_name),
-                    "prompt_secured": True
+                    "prompt_secured": True,
+                    "email_protected": True  # Added privacy confirmation
                 }
             }
             
@@ -397,7 +395,8 @@ class StoryTellerAgent(BaseAgent):
                     "error": "fallback_due_to_error",
                     "generation_method": "emergency_fallback",
                     "security_validated": True,
-                    "content_hash": self.security_validator.hash_for_logging(fallback_story)
+                    "content_hash": self.security_validator.hash_for_logging(fallback_story),
+                    "email_protected": True
                 }
             }
 
