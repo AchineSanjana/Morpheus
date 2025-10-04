@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { streamChat } from "../lib/api";
 import { ResponseAnalysis } from "./ResponsibleAI";
+import { AudioPlayer } from "./AudioPlayer";
 
 type Msg = { 
   role: "user" | "assistant"; 
@@ -9,7 +10,93 @@ type Msg = {
   responsibleAIChecks?: Record<string, any>;
   responsibleAIPassed?: boolean;
   responsibleAIRiskLevel?: string;
+  data?: Record<string, any>;
+  audioId?: string;  // For generated audio
 };
+
+// Component for the Generate Audio button
+function GenerateAudioButton({ message, messageIndex, setMsgs }: { 
+  message: Msg; 
+  messageIndex: number; 
+  setMsgs: React.Dispatch<React.SetStateAction<Msg[]>>; 
+}) {
+  const [isGenerating, setIsGenerating] = useState(false);
+  
+  // Check if this is a storyteller response that can have audio
+  const isStorytellerResponse = message.data?.agent === "storyteller" || 
+                              (message.content.length > 100 && 
+                               (message.content.toLowerCase().includes("once upon") || 
+                                message.content.toLowerCase().includes("story") ||
+                                message.content.toLowerCase().includes("bedtime")));
+  
+  // Don't show button if audio already generated or not a story
+  if (!isStorytellerResponse || message.audioId || !message.content.trim()) {
+    return null;
+  }
+
+  const generateAudio = async () => {
+    setIsGenerating(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        throw new Error("Please sign in to generate audio");
+      }
+
+      const response = await fetch('http://localhost:8001/audio/generate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({ text: message.content })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to generate audio');
+      }
+
+      const audioData = await response.json();
+
+      // Update the message with audio ID
+      setMsgs(msgs => {
+        const updatedMsgs = [...msgs];
+        updatedMsgs[messageIndex] = { 
+          ...updatedMsgs[messageIndex], 
+          audioId: audioData.audio_id 
+        };
+        return updatedMsgs;
+      });
+
+    } catch (error: any) {
+      console.error('Audio generation error:', error);
+      alert(error.message || 'Failed to generate audio');
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  return (
+    <div className="mt-3">
+      <button
+        onClick={generateAudio}
+        disabled={isGenerating}
+        className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 disabled:from-gray-600 disabled:to-gray-700 text-white text-sm font-medium rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl disabled:cursor-not-allowed"
+      >
+        {isGenerating ? (
+          <>
+            <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+            <span>Generating Audio...</span>
+          </>
+        ) : (
+          <>
+            <span className="text-lg">🎵</span>
+            <span>Generate Audio</span>
+          </>
+        )}
+      </button>
+    </div>
+  );
+}
 
 export function Chat() {
   const [msgs, setMsgs] = useState<Msg[]>([
@@ -47,12 +134,16 @@ export function Chat() {
     setStatus({type:"typing", msg:"AI is thinking..."});
     
     try {
-      await streamChat(text, session.access_token, (chunk) => {
+      await streamChat(text, session.access_token, (chunk, responsibleAIData, data) => {
         setMsgs(m => {
           const copy = [...m]; 
           copy[copy.length - 1] = { 
             role: "assistant", 
-            content: copy[copy.length - 1].content + chunk 
+            content: copy[copy.length - 1].content + chunk,
+            responsibleAIChecks: responsibleAIData?.responsibleAIChecks,
+            responsibleAIPassed: responsibleAIData?.responsibleAIPassed,
+            responsibleAIRiskLevel: responsibleAIData?.responsibleAIRiskLevel,
+            data: data
           };
           return copy;
         });
@@ -111,7 +202,8 @@ export function Chat() {
                   : "bg-slate-800/80 border border-slate-700/50 text-slate-100 shadow-md"
               }`}>
                 {m.role === "assistant" ? (
-                  <div>
+                  <div className="space-y-3">
+                    {/* Text content */}
                     <div className="text-sm leading-relaxed">
                       {m.content ? formatMessage(m.content) : (
                         isAssistantTyping ? (
@@ -127,6 +219,26 @@ export function Chat() {
                         )
                       )}
                     </div>
+                    
+                    {/* Audio Player for generated audio */}
+                    {m.audioId && (
+                      <AudioPlayer 
+                        audioData={{ 
+                          available: true,
+                          file_id: m.audioId, 
+                          metadata: { 
+                            estimated_duration_minutes: Math.ceil(m.content.split(' ').length / 130), // ~130 words per minute
+                            estimated_duration_seconds: Math.ceil(m.content.split(' ').length / 130) * 60,
+                            word_count: m.content.split(' ').length
+                          } 
+                        }} 
+                        storyText={m.content} 
+                      />
+                    )}
+                    
+                    {/* Generate Audio Button for Storyteller */}
+                    <GenerateAudioButton message={m} messageIndex={i} setMsgs={setMsgs} />
+                    
                     {/* Show responsible AI analysis if available */}
                     {m.content && m.responsibleAIChecks && (
                       <div className="mt-3">

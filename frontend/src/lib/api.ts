@@ -1,4 +1,8 @@
-export async function streamChat(message: string, token: string, onChunk:(t:string)=>void) {
+export async function streamChat(
+  message: string, 
+  token: string, 
+  onChunk: (chunk: string, responsibleAIData?: any, data?: any) => void
+) {
   const api = import.meta.env.VITE_API_URL as string;
   const res = await fetch(`${api}/chat/stream`, {
     method:"POST",
@@ -6,11 +10,52 @@ export async function streamChat(message: string, token: string, onChunk:(t:stri
     body: JSON.stringify({ message })
   });
   if (!res.ok || !res.body) throw new Error("chat stream failed");
-  const reader = res.body.getReader(); const dec = new TextDecoder();
+  
+  const reader = res.body.getReader(); 
+  const dec = new TextDecoder();
+  let buffer = "";
+  
   while (true) {
     const { value, done } = await reader.read();
     if (done) break;
-    onChunk(dec.decode(value));
+    
+    buffer += dec.decode(value, { stream: true });
+    
+    // Look for complete JSON objects in the buffer
+    let newlineIndex;
+    while ((newlineIndex = buffer.indexOf('\n')) !== -1) {
+      const line = buffer.slice(0, newlineIndex).trim();
+      buffer = buffer.slice(newlineIndex + 1);
+      
+      if (line) {
+        try {
+          // Try to parse as JSON for structured responses
+          const parsed = JSON.parse(line);
+          if (parsed.text) {
+            onChunk(parsed.text, parsed.responsible_ai_checks, parsed.data);
+          } else {
+            onChunk(line);
+          }
+        } catch {
+          // If not JSON, treat as plain text
+          onChunk(line);
+        }
+      }
+    }
+  }
+  
+  // Handle any remaining buffer content
+  if (buffer.trim()) {
+    try {
+      const parsed = JSON.parse(buffer);
+      if (parsed.text) {
+        onChunk(parsed.text, parsed.responsible_ai_checks, parsed.data);
+      } else {
+        onChunk(buffer);
+      }
+    } catch {
+      onChunk(buffer);
+    }
   }
 }
 // Mirrors backend/app/schemas.py SleepLogIn

@@ -7,6 +7,7 @@ from datetime import datetime
 
 from . import BaseAgent, AgentContext, AgentResponse
 from app.llm_gemini import generate_gemini_text, gemini_ready
+from app.audio_service import audio_service
 
 logger = logging.getLogger(__name__)
 security_logger = logging.getLogger("security")
@@ -191,6 +192,7 @@ class StoryTellerAgent(BaseAgent):
         self.story_preferences = {}  # Track user preferences (encrypted)
         self.story_history = []  # Track recent stories for variety
         self.security_validator = SecurityValidator()
+        self.audio_enabled = True  # Enable audio features
 
     def _extract_story_preferences(self, message: str, ctx: Optional[AgentContext] = None) -> Dict[str, Any]:
         """Extract story preferences from sanitized user message and context"""
@@ -353,7 +355,10 @@ class StoryTellerAgent(BaseAgent):
                 story_text = self._select_fallback_story()
                 logger.info("Using validated fallback story")
             
-            # Prepare response data with security metadata (no sensitive data)
+            # Always provide text story first - audio is now optional via button
+            # No automatic audio generation - user can request it via "Generate Audio" button
+            
+            # Prepare response data with security metadata and audio capability info
             response_data = {
                 "preferences": {
                     "theme": preferences.get("theme"),
@@ -369,12 +374,18 @@ class StoryTellerAgent(BaseAgent):
                     "security_validated": True,
                     "content_hash": self.security_validator.hash_for_logging(story_text)
                 },
+                "audio_capability": {
+                    "available": self.audio_enabled,
+                    "can_generate": True,
+                    "story_suitable_for_audio": len(story_text) > 50,
+                    "estimated_audio_duration": f"{len(story_text.split()) // 130} minute(s)"
+                },
                 "security_info": {
                     "input_sanitized": True,
                     "output_validated": True,
                     "user_name_sanitized": bool(user_name),
                     "prompt_secured": True,
-                    "email_protected": True  # Added privacy confirmation
+                    "email_protected": True
                 }
             }
             
@@ -396,7 +407,8 @@ class StoryTellerAgent(BaseAgent):
                     "generation_method": "emergency_fallback",
                     "security_validated": True,
                     "content_hash": self.security_validator.hash_for_logging(fallback_story),
-                    "email_protected": True
+                    "email_protected": True,
+                    "audio": {"available": False, "error": "Emergency fallback mode"}
                 }
             }
 

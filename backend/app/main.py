@@ -2,10 +2,15 @@
 load_dotenv()  # load backend/.env before importing anything that uses env vars
 # app/main.py
 import os, asyncio
+import logging
 from datetime import datetime
+
+logger = logging.getLogger(__name__)
 from fastapi import FastAPI, Header, HTTPException, File, UploadFile, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse, JSONResponse
+from fastapi.responses import StreamingResponse, JSONResponse, FileResponse
+from pathlib import Path
+import re
 from .schemas import ChatRequest, SleepLogIn
 from .db import get_current_user, insert_sleep_log, supabase
 from starlette.concurrency import run_in_threadpool
@@ -516,3 +521,156 @@ async def get_responsible_ai_audit_log(
         },
         "note": "Full audit logging requires additional security and storage infrastructure"
     }
+
+# Audio endpoints
+@app.options("/audio/{audio_id}")
+async def audio_options(audio_id: str):
+    """Handle CORS preflight for audio files"""
+    return JSONResponse(
+        content={"message": "OK"},
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
+            "Access-Control-Allow-Headers": "*"
+        }
+    )
+
+@app.get("/audio/{audio_id}")
+async def serve_audio_file(audio_id: str, request: Request):
+    """Serve audio files with security validation"""
+    try:
+        # Lighter security validation for audio files (they're public content)
+        # await security_middleware.validate_request_security(request)
+        
+        # Validate audio ID format (should be hash)
+        if not re.match(r'^[a-f0-9]{32}$', audio_id):
+            raise HTTPException(400, "Invalid audio ID format")
+        
+        # Find audio file
+        audio_file = Path(f"audio_cache/{audio_id}.mp3")
+        if not audio_file.exists():
+            raise HTTPException(404, "Audio file not found")
+        
+        # Security check - ensure file is in allowed directory
+        if not str(audio_file.resolve()).startswith(str(Path("audio_cache").resolve())):
+            raise HTTPException(403, "Access denied")
+        
+        # Serve file with appropriate headers including CORS
+        return FileResponse(
+            audio_file,
+            media_type="audio/mpeg",
+            headers={
+                "Cache-Control": "public, max-age=3600",  # Cache for 1 hour
+                "Content-Disposition": f"inline; filename=story_{audio_id}.mp3",
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
+                "Access-Control-Allow-Headers": "*"
+            }
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error serving audio file: {e}")
+        raise HTTPException(500, "Audio service error")
+
+@app.post("/audio/cleanup")
+async def cleanup_audio_cache(request: Request):
+    """Manual audio cache cleanup endpoint"""
+    try:
+        # Security validation
+        await security_middleware.validate_request_security(request)
+        
+        # Import audio service here to avoid circular imports
+        from app.audio_service import audio_service
+        
+        # Cleanup old files
+        audio_service.cleanup_old_cache(max_age_days=7)
+        
+        return {"message": "Audio cache cleaned up successfully"}
+        
+    except Exception as e:
+        logger.error(f"Cache cleanup error: {e}")
+        raise HTTPException(500, "Cleanup failed")
+
+@app.get("/audio/status")
+async def get_audio_status():
+    """Get audio service status"""
+    try:
+        from app.audio_service import audio_service
+        
+        cache_dir = Path("audio_cache")
+        cache_files = list(cache_dir.glob("*.mp3")) + list(cache_dir.glob("*.wav"))
+        
+        return {
+            "service_available": True,
+            "cache_directory": str(cache_dir),
+            "cached_files_count": len(cache_files),
+            "audio_settings": audio_service.settings,
+            "features": {
+                "text_to_speech": True,
+                "caching": True,
+                "multiple_formats": True,
+                "bedtime_optimized": True
+            }
+        }
+    except Exception as e:
+        return {
+            "service_available": False,
+            "error": str(e)[:100],
+            "message": "Audio service not available"
+        }
+
+@app.post("/audio/generate")
+async def generate_audio_from_text(request: Request):
+    """Generate audio from story text on-demand"""
+    try:
+        # Security validation
+        await security_middleware.validate_request_security(request)
+        
+        # Get request body
+        body = await request.json()
+        story_text = body.get("text", "").strip()
+        
+        if not story_text:
+            raise HTTPException(400, "Story text is required")
+        
+        if len(story_text) < 10:
+            raise HTTPException(400, "Story text too short for audio generation")
+        
+        if len(story_text) > 10000:  # Reasonable limit for TTS
+            raise HTTPException(400, "Story text too long for audio generation")
+        
+        # Import audio service
+        from app.audio_service import audio_service
+        
+        # Generate audio file
+        audio_file_path = await audio_service.text_to_speech_file(
+            story_text, 
+            output_format="mp3",
+            use_cache=True
+        )
+        
+        if not audio_file_path:
+            raise HTTPException(500, "Failed to generate audio")
+        
+        # Get audio metadata
+        audio_metadata = audio_service.get_audio_metadata(story_text)
+        
+        # Extract just the filename for secure serving
+        audio_filename = audio_file_path.split('/')[-1].replace('.mp3', '') if '/' in audio_file_path else audio_file_path.split('\\')[-1].replace('.mp3', '')
+        
+        logger.info(f"Audio generated on-demand - Duration: {audio_metadata['estimated_duration_minutes']} min")
+        
+        return {
+            "success": True,
+            "audio_id": audio_filename,
+            "metadata": audio_metadata,
+            "message": "Audio generated successfully"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error generating audio: {str(e)[:100]}")
+        raise HTTPException(500, "Audio generation failed")
