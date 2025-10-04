@@ -124,8 +124,9 @@ STORY_THEMES = {
 
 STORY_LENGTHS = {
     "short": {"words": "120-180", "description": "A brief, gentle tale"},
-    "medium": {"words": "180-300", "description": "A comfortable bedtime story"},
-    "long": {"words": "300-450", "description": "A longer, more detailed story"}
+    "medium": {"words": "800-1200", "description": "A comfortable bedtime story"},
+    "long": {"words": "1200-1500", "description": "A longer, more detailed story"},
+    "extended": {"words": "1500-2000", "description": "An immersive, detailed bedtime journey"}
 }
 
 SYSTEM_STYLE_BASE = (
@@ -201,7 +202,7 @@ class StoryTellerAgent(BaseAgent):
         
         preferences = {
             "theme": None,
-            "length": "medium",
+            "length": "medium",  # Now defaults to ~1000 words
             "custom_topic": None,
             "include_name": True,
             "mood": "calm"
@@ -218,7 +219,9 @@ class StoryTellerAgent(BaseAgent):
         # Extract length preferences
         if any(word in message_lower for word in ["short", "brief", "quick"]):
             preferences["length"] = "short"
-        elif any(word in message_lower for word in ["long", "detailed", "extended"]):
+        elif any(word in message_lower for word in ["very long", "extended", "detailed", "immersive"]):
+            preferences["length"] = "extended"
+        elif any(word in message_lower for word in ["long"]):
             preferences["length"] = "long"
         
         # Extract custom topic (with additional sanitization)
@@ -246,6 +249,13 @@ class StoryTellerAgent(BaseAgent):
         
         prompt = f"{SYSTEM_STYLE_BASE}\n\n"
         prompt += f"Write a {preferences['length']} bedtime story ({length_info['words']} words). "
+        
+        # Add length-specific guidance
+        if preferences["length"] in ["medium", "long", "extended"]:
+            prompt += "For this longer story, include: multiple gentle scenes, "
+            prompt += "rich sensory descriptions, character development, "
+            prompt += "a clear but gentle progression, and several peaceful moments. "
+            prompt += "Take time to build atmosphere and create a immersive, calming experience. "
         
         # Add theme guidance (pre-validated themes only)
         if preferences["theme"] and preferences["theme"] in STORY_THEMES:
