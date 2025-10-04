@@ -42,7 +42,7 @@ function GenerateAudioButton({ message, messageIndex, setMsgs }: {
         throw new Error("Please sign in to generate audio");
       }
 
-      const response = await fetch('http://localhost:8001/audio/generate', {
+      const response = await fetch('http://localhost:8000/audio/generate', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

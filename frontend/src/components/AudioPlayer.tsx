@@ -92,7 +92,7 @@ export function AudioPlayer({ audioData, storyText }: AudioPlayerProps) {
   }
 
   const audioUrl = audioData.file_id ? 
-    `http://localhost:8001/audio/${audioData.file_id}` : 
+    `http://localhost:8000/audio/${audioData.file_id}` : 
     '';
 
   return (

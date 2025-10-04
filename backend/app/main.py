@@ -574,6 +574,49 @@ async def serve_audio_file(audio_id: str, request: Request):
         logger.error(f"Error serving audio file: {e}")
         raise HTTPException(500, "Audio service error")
 
+@app.post("/audio/generate")
+async def generate_audio(request: Request):
+    """Generate audio file from text"""
+    try:
+        # Get the request body
+        body = await request.json()
+        text = body.get("text", "").strip()
+        
+        if not text:
+            raise HTTPException(400, "Text content is required")
+        
+        if len(text) > 10000:  # Reasonable limit
+            raise HTTPException(400, "Text content too long (max 10000 characters)")
+        
+        # Import audio service
+        from app.audio_service import audio_service
+        
+        # Generate audio file
+        audio_file_path = await audio_service.text_to_speech_file(text, use_cache=True)
+        
+        if not audio_file_path:
+            raise HTTPException(500, "Failed to generate audio")
+        
+        # Extract the file ID from the path
+        from pathlib import Path
+        file_id = Path(audio_file_path).stem  # Get filename without extension
+        
+        # Get metadata
+        metadata = audio_service.get_audio_metadata(text)
+        
+        return {
+            "success": True,
+            "audio_id": file_id,
+            "metadata": metadata,
+            "url": f"/audio/{file_id}"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error generating audio: {e}")
+        raise HTTPException(500, "Audio generation failed")
+
 @app.post("/audio/cleanup")
 async def cleanup_audio_cache(request: Request):
     """Manual audio cache cleanup endpoint"""
