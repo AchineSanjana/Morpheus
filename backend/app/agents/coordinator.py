@@ -79,7 +79,8 @@ class CoordinatorAgent(BaseAgent):
         )
 
         try:
-            raw = await generate_gemini_text(prompt, model_name="gemini-2.0-flash-exp") or ""
+            # Use default preferred model (gemini-2.5-flash) with automatic fallbacks
+            raw = await generate_gemini_text(prompt) or ""
         except Exception:
             return None
 

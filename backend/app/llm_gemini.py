@@ -15,10 +15,13 @@ if api_key and genai:
         pass
 
 # Preferred model can be overridden via env; default to gemini-2.5-flash
-# Option A (sequential fallback):
-#   - Set GEMINI_PREFERRED_MODEL=gemini-2.5-flash (or another)
-#   - Optionally set GEMINI_FALLBACK_MODELS=gemini-2.0-flash-exp,gemini-2.0-flash,gemini-1.5-flash,gemini-1.5-flash-8b
-# The helper below will try preferred first, then try each fallback in order.
+# Sequential fallback order (by default):
+#   1) gemini-2.5-flash (preferred)
+#   2) gemini-2.0-flash
+#   3) gemini-2.0-flash-exp
+#   4) gemini-1.5-flash
+#   5) gemini-1.5-flash-8b
+# You can prepend additional models via GEMINI_FALLBACK_MODELS (comma-separated), which will be tried after the preferred model and before the defaults above.
 DEFAULT_PREFERRED_MODEL = os.getenv("GEMINI_PREFERRED_MODEL") or "gemini-2.5-flash"
 
 def gemini_ready() -> bool:
@@ -30,10 +33,10 @@ def _fallback_model_list(preferred: str, env_val: Optional[str]) -> List[str]:
     You can override fallbacks via env var GEMINI_FALLBACK_MODELS as a comma-separated list.
     """
     # Default fallbacks chosen for broad availability (non-pro models only)
+    # Requested order: prefer 2.0 stable before 2.0 experimental.
     defaults = [
-        # First prefer 2.0 experimental, then 2.0 stable, then older broadly-available models
-        "gemini-2.0-flash-exp",
         "gemini-2.0-flash",
+        "gemini-2.0-flash-exp",
         "gemini-1.5-flash",
         "gemini-1.5-flash-8b",
     ]
@@ -60,9 +63,9 @@ async def generate_gemini_text(
 ) -> Optional[str]:
     """Generate text with Gemini, trying fallbacks when the preferred model fails.
 
-        - model_name: preferred model to try first (default comes from GEMINI_PREFERRED_MODEL or 'gemini-2.0-flash-exp')
+        - model_name: preferred model to try first (default comes from GEMINI_PREFERRED_MODEL or 'gemini-2.5-flash')
         - fallback_models: optional list of model names to try next; if not provided,
-            falls back to env GEMINI_FALLBACK_MODELS or sensible non-pro defaults.
+            falls back to env GEMINI_FALLBACK_MODELS or sensible non-pro defaults (2.0-flash, 2.0-flash-exp, 1.5-flash, 1.5-flash-8b).
     """
     if not api_key or not genai:
         print("GEMINI_API_KEY not found or google.generativeai not available. Skipping LLM call.")
@@ -81,6 +84,7 @@ async def generate_gemini_text(
             resp = await model.generate_content_async(prompt)
             text = getattr(resp, "text", None)
             if text and text.strip():
+                print(f"Gemini model '{m}' succeeded.")
                 return text
             else:
                 # Try next model if empty/invalid
