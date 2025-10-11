@@ -14,9 +14,12 @@ if api_key and genai:
         # ignore configuration errors at import time
         pass
 
-# Preferred model can be overridden via env; default to gemini-2.0-flash-exp
-# We will fall back to non-pro broadly-available models when rate-limited or unavailable.
-DEFAULT_PREFERRED_MODEL = os.getenv("GEMINI_PREFERRED_MODEL") or "gemini-2.0-flash-exp"
+# Preferred model can be overridden via env; default to gemini-2.5-flash
+# Option A (sequential fallback):
+#   - Set GEMINI_PREFERRED_MODEL=gemini-2.5-flash (or another)
+#   - Optionally set GEMINI_FALLBACK_MODELS=gemini-2.0-flash-exp,gemini-2.0-flash,gemini-1.5-flash,gemini-1.5-flash-8b
+# The helper below will try preferred first, then try each fallback in order.
+DEFAULT_PREFERRED_MODEL = os.getenv("GEMINI_PREFERRED_MODEL") or "gemini-2.5-flash"
 
 def gemini_ready() -> bool:
     """Return True when the Gemini API key is configured and client is usable."""
@@ -28,6 +31,9 @@ def _fallback_model_list(preferred: str, env_val: Optional[str]) -> List[str]:
     """
     # Default fallbacks chosen for broad availability (non-pro models only)
     defaults = [
+        # First prefer 2.0 experimental, then 2.0 stable, then older broadly-available models
+        "gemini-2.0-flash-exp",
+        "gemini-2.0-flash",
         "gemini-1.5-flash",
         "gemini-1.5-flash-8b",
     ]
