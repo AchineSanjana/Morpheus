@@ -106,12 +106,14 @@ export function Auth({ onAuthed }:{ onAuthed:()=>void }) {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 flex items-center justify-center p-4 relative">
+      <div className="absolute inset-0 bg-animated-gradient"></div>
+      <div className="absolute inset-0 bg-moving-clouds"></div>
       {/* Background decoration */}
       <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-indigo-400/15 rounded-full blur-3xl"></div>
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-cyan-400/15 rounded-full blur-3xl"></div>
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-purple-400/10 rounded-full blur-3xl"></div>
+        <div className="bg-orb absolute -top-40 -right-40 w-80 h-80 bg-indigo-400/20 rounded-full blur-3xl [animation-delay:0s] motion-reduce:[animation:none]"></div>
+        <div className="bg-orb absolute -bottom-40 -left-40 w-80 h-80 bg-cyan-400/20 rounded-full blur-3xl [animation-delay:3s] motion-reduce:[animation:none]"></div>
+        <div className="bg-orb absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-purple-400/15 rounded-full blur-3xl [animation-delay:6s] motion-reduce:[animation:none]"></div>
       </div>
 
       <div className="relative w-full max-w-md">

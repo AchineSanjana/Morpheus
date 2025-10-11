@@ -12,7 +12,12 @@ import { supabase } from "../lib/supabaseClient";
  * - Numeric inputs sanitized; slider for screen time
  */
 export function SleepLogForm() {
-  const todayIso = useMemo(()=>new Date().toISOString().slice(0,10), []);
+  // Use local date (not UTC) to avoid off-by-one day in some timezones
+  const todayIso = useMemo(()=>{
+    const d = new Date();
+    const pad = (n:number)=>String(n).padStart(2,'0');
+    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+  }, []);
   const [date,setDate]=useState<string>(todayIso);
   const [bedtime,setBedtime]=useState<string>("");
   const [wake,setWake]=useState<string>("");
@@ -109,6 +114,14 @@ export function SleepLogForm() {
   setWake(`${w.getFullYear()}-${pad(w.getMonth()+1)}-${pad(w.getDate())}T${pad(w.getHours())}:${pad(w.getMinutes())}`);
   }
 
+  // Convenience presets for common entries
+  function setLastNightPreset(hh:number, mm:number=0){
+    const now = new Date();
+    const lastNight = new Date(now.getFullYear(), now.getMonth(), now.getDate()-1, hh, mm, 0, 0);
+    const pad=(n:number)=>n.toString().padStart(2,'0');
+    setBedtime(`${lastNight.getFullYear()}-${pad(lastNight.getMonth()+1)}-${pad(lastNight.getDate())}T${pad(lastNight.getHours())}:${pad(lastNight.getMinutes())}`);
+  }
+
   const canSubmit = !!date && !saving; // we allow partial times – analytics code handles nulls
 
   async function submit(e:React.FormEvent){
@@ -169,7 +182,10 @@ export function SleepLogForm() {
           <label className="flex flex-col gap-2 text-sm group sm:col-span-1">
             <span className="font-medium text-slate-200 flex items-center justify-between">
               <span className="flex items-center gap-2">🌙 Bedtime</span>
-              <button type="button" onClick={setNowAsBed} className="text-xs text-cyan-400 hover:text-cyan-300 transition-colors px-2 py-1 rounded-md hover:bg-cyan-400/10">Now</button>
+              <div className="flex gap-1">
+                <button type="button" onClick={setNowAsBed} className="text-xs text-cyan-400 hover:text-cyan-300 transition-colors px-2 py-1 rounded-md hover:bg-cyan-400/10">Now</button>
+                <button type="button" onClick={()=>setLastNightPreset(22,30)} className="text-xs text-cyan-400 hover:text-cyan-300 transition-colors px-2 py-1 rounded-md hover:bg-cyan-400/10" title="Set 10:30 PM last night">22:30</button>
+              </div>
             </span>
             <input className="bg-slate-800/80 border border-slate-600/50 p-3 rounded-xl transition-all duration-200 focus:border-indigo-400 focus:bg-slate-800 focus:ring-2 focus:ring-indigo-400/20 focus:outline-none" type="datetime-local" value={bedtime} onChange={e=>setBedtime(e.target.value)} />
           </label>
@@ -179,6 +195,7 @@ export function SleepLogForm() {
               <div className="flex gap-1">
                 <button type="button" onClick={setNowAsWake} className="text-xs text-cyan-400 hover:text-cyan-300 transition-colors px-2 py-1 rounded-md hover:bg-cyan-400/10">Now</button>
                 {bedtime && <button type="button" onClick={()=>setWakePlus(7)} className="text-xs text-cyan-400 hover:text-cyan-300 transition-colors px-2 py-1 rounded-md hover:bg-cyan-400/10">+7h</button>}
+                {bedtime && <button type="button" onClick={()=>setWakePlus(7.5)} className="text-xs text-cyan-400 hover:text-cyan-300 transition-colors px-2 py-1 rounded-md hover:bg-cyan-400/10" title="7.5h is a common target">+7.5h</button>}
                 {bedtime && <button type="button" onClick={()=>setWakePlus(8)} className="text-xs text-cyan-400 hover:text-cyan-300 transition-colors px-2 py-1 rounded-md hover:bg-cyan-400/10">+8h</button>}
               </div>
             </span>

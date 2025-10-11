@@ -2,3 +2,138 @@
 
 :root { color-scheme: dark; }
 body { background:#0a0a0a; color:#e5e5e5; margin:0; }
+
+/* Animated background orbs */
+@keyframes orbFloat {
+	0%   { transform: translate3d(0,0,0) scale(1); }
+	25%  { transform: translate3d(8%, -6%, 0) scale(1.06); }
+	50%  { transform: translate3d(0, 10%, 0) scale(0.98); }
+	75%  { transform: translate3d(-10%, -4%, 0) scale(1.04); }
+	100% { transform: translate3d(0,0,0) scale(1); }
+}
+.bg-orb {
+	/* Subtle, continuous drift */
+	animation: orbFloat 22s ease-in-out infinite;
+	will-change: transform, opacity;
+	pointer-events: none;
+}
+@media (prefers-reduced-motion: reduce) {
+	.bg-orb { animation: none; }
+}
+
+/* Subtle animated gradient background */
+@keyframes gradientShift {
+	0% { background-position: 0% 50%; }
+	50% { background-position: 100% 50%; }
+	100% { background-position: 0% 50%; }
+}
+.bg-animated-gradient {
+	/* Soft indigo → cyan → purple overlay with low alpha */
+	background-image: linear-gradient(120deg,
+		rgba(99, 102, 241, 0.10), /* indigo-500 */
+		rgba(34, 211, 238, 0.08), /* cyan-400 */
+		rgba(168, 85, 247, 0.10), /* purple-500 */
+		rgba(99, 102, 241, 0.10)
+	);
+		background-size: 300% 300%;
+		/* Shorter cycle for quicker color shift */
+		animation: gradientShift 2s ease-in-out infinite;
+	pointer-events: none;
+}
+@media (prefers-reduced-motion: reduce) {
+	.bg-animated-gradient { animation: none; }
+}
+
+/* Moving color clouds using animated radial-gradients */
+@keyframes cloudsMove {
+	0%   { background-position: 
+					10% 20%,  /* indigo */
+					80% 10%,  /* cyan */
+					20% 80%,  /* purple */
+					70% 50%,  /* fuchsia */
+					30% 30%,  /* emerald */
+					55% 75%   /* blue */
+				; }
+	50%  { background-position: 
+					80% 40%,
+					20% 70%,
+					70% 30%,
+					25% 45%,
+					85% 60%,
+					35% 20%
+				; }
+	100% { background-position: 
+					10% 20%,
+					80% 10%,
+					20% 80%,
+					70% 50%,
+					30% 30%,
+					55% 75%
+				; }
+}
+.bg-moving-clouds {
+	background-image:
+		radial-gradient(40% 40% at center, rgba(99,102,241,0.14), transparent 60%),  /* indigo-500 */
+		radial-gradient(45% 45% at center, rgba(34,211,238,0.10), transparent 60%), /* cyan-400 */
+		radial-gradient(50% 50% at center, rgba(168,85,247,0.12), transparent 62%), /* purple-500 */
+		radial-gradient(42% 42% at center, rgba(217,70,239,0.10), transparent 60%),  /* fuchsia-500 */
+		radial-gradient(48% 48% at center, rgba(16,185,129,0.10), transparent 62%),  /* emerald-500 */
+		radial-gradient(38% 38% at center, rgba(59,130,246,0.10), transparent 58%);  /* blue-500 */
+	background-repeat: no-repeat;
+	background-size: 
+		85% 85%,  /* indigo */
+		70% 70%,  /* cyan */
+		95% 95%,  /* purple */
+		60% 60%,  /* fuchsia */
+		75% 75%,  /* emerald */
+		55% 55%;  /* blue */
+	animation: cloudsMove 24s ease-in-out infinite;
+	pointer-events: none;
+}
+@media (prefers-reduced-motion: reduce) {
+	.bg-moving-clouds { animation: none; }
+}
+
+/* Hover-reveal scrollbar with zero layout shift: reserve space via padding and swap to real scrollbar on hover */
+.hover-scrollbar {
+	/* Use runtime-calculated scrollbar width if available, fallback to 8px */
+	--sbw: var(--scrollbar-w, 8px);
+	/* Constant gap between content and visible scrollbar */
+		--gap: 15px;
+	box-sizing: border-box; /* Tailwind sets border-box; we want padding to affect inner content width */
+	/* Reserve scrollbar space + the constant gap when not hovered */
+	padding-right: calc(var(--sbw) + var(--gap));
+
+	/* Also hint to modern engines to keep gutter stable */
+	scrollbar-gutter: stable both-edges;
+
+	/* Hide in Firefox until hover */
+	scrollbar-width: none;
+}
+.hover-scrollbar:hover {
+	/* Keep a constant gap when the scrollbar is visible */
+	padding-right: var(--gap);
+	scrollbar-width: thin; /* show in Firefox */
+}
+.hover-scrollbar::-webkit-scrollbar {
+	/* Hidden by default; we provide gutter via padding-right */
+	width: 0px;
+	height: 0px;
+}
+.hover-scrollbar:hover::-webkit-scrollbar {
+	width: var(--sbw);
+	height: var(--sbw);
+}
+.hover-scrollbar::-webkit-scrollbar-thumb {
+	background-color: transparent;
+}
+.hover-scrollbar::-webkit-scrollbar-track {
+	background-color: transparent;
+}
+.hover-scrollbar:hover::-webkit-scrollbar-thumb {
+	background-color: rgba(100,116,139,0.6); /* slate-500/60 */
+	border-radius: 8px;
+}
+.hover-scrollbar:hover::-webkit-scrollbar-track {
+	background-color: rgba(15,23,42,0.6); /* slate-900/60 */
+}

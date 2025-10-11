@@ -100,6 +100,28 @@ export async function saveSleepLog(payload: SleepLogPayload, token: string) {
   if (!res.ok) throw new Error("sleep log failed");
 }
 
+// Sleep log record returned by backend
+export type SleepLog = SleepLogPayload & {
+  id?: string;
+  user_id?: string;
+  created_at?: string;
+  updated_at?: string;
+  duration_h?: number | null; // computed server-side when possible
+};
+
+export async function fetchRecentSleepLogs(token: string, days = 7): Promise<SleepLog[]> {
+  const api = import.meta.env.VITE_API_URL as string;
+  const res = await fetch(`${api}/sleep-logs?days=${days}`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  if (!res.ok) {
+    const text = await safeReadText(res);
+    throw new HttpError(res.status, text, `Failed to fetch sleep logs (${res.status})`);
+  }
+  const data = await res.json();
+  return (data?.logs ?? []) as SleepLog[];
+}
+
 type Message = {
   id: string;
   text: string;

@@ -88,7 +88,7 @@ function GenerateAudioButton({ message, messageIndex, setMsgs }: {
 }
 
 export function Chat() {
-  const { fullWidthChat, compactMode, sidebarCollapsed, toggleFullWidthChat, toggleCompactMode, toggleSidebarCollapsed } = useLayout();
+  const { compactMode, sidebarCollapsed, toggleCompactMode, toggleSidebarCollapsed } = useLayout();
   const [msgs, setMsgs] = useState<Msg[]>([
     { 
       role: "assistant", 
@@ -304,7 +304,7 @@ export function Chat() {
   }
 
   const bubbleBase = compactMode ? 'rounded-xl px-3 py-2 text-[13px] leading-[1.45]' : 'rounded-2xl px-4 py-3 text-sm leading-relaxed';
-  const containerHeight = compactMode ? 'h-[82vh]' : 'h-[78vh]';
+  const containerHeight = compactMode ? 'h-[100vh]' : 'h-[100vh]';
   const messageGap = compactMode ? 'space-y-3' : 'space-y-4';
 
   return (
@@ -313,14 +313,29 @@ export function Chat() {
       <div className="absolute inset-0 bg-gradient-to-br from-indigo-400/10 via-transparent to-cyan-400/10 rounded-2xl blur-xl"></div>
       
   <div className={`relative flex flex-col md:flex-row ${containerHeight} bg-gradient-to-br from-slate-900/95 to-slate-800/95 backdrop-blur-sm border border-slate-700/50 rounded-2xl shadow-2xl shadow-black/20`}>
-        {/* Sidebar: Conversations */}
-        <div className={`${sidebarCollapsed ? 'hidden' : 'hidden md:flex'} md:w-80 flex-col border-r border-slate-700/50 p-3 gap-2 overflow-y-auto`} aria-label="Conversations">
+  {/* Sidebar: Conversations */}
+        <div id="chat-history-panel" className={`${sidebarCollapsed ? 'hidden' : 'hidden md:flex'} md:w-80 flex-col border-r border-slate-700/50 p-3 gap-2 overflow-y-auto hover-scrollbar`} aria-label="Conversations">
           <div className="flex items-center justify-between mb-1">
-            <div className="text-slate-300 text-sm font-semibold">Conversations</div>
-            <button
-              onClick={() => { setConversationId(null); setConversationTitle(null); setMsgs(getWelcome()); localStorage.removeItem('activeConversationId'); localStorage.removeItem('activeConversationTitle'); }}
-              className="text-xs text-cyan-300 hover:text-white"
-            >New</button>
+            <div className="text-slate-300 text-sm font-semibold">Chat History</div>
+            <div className="flex items-center gap-2">
+              {/* Collapse sidebar (md+) */}
+              <button
+                className="hidden md:inline-flex items-center justify-center w-8 h-8 rounded-full border border-slate-400/30 text-slate-300 hover:text-white hover:border-slate-300 transition"
+                onClick={toggleSidebarCollapsed}
+                aria-label="Collapse history"
+                aria-controls="chat-history-panel"
+                aria-expanded={!sidebarCollapsed}
+                title="Collapse history"
+              >
+                <svg className="w-4 h-4 rotate-180" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M9 6l6 6-6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+              <button
+                onClick={() => { setConversationId(null); setConversationTitle(null); setMsgs(getWelcome()); localStorage.removeItem('activeConversationId'); localStorage.removeItem('activeConversationTitle'); }}
+                className="text-xs text-cyan-300 hover:text-white"
+              >New</button>
+            </div>
           </div>
           <div className="flex flex-col gap-1">
             {conversations.length === 0 && (
@@ -346,6 +361,21 @@ export function Chat() {
         <div className="flex-1 flex flex-col min-w-0">
           {/* Header */}
           <div className={`flex items-center gap-3 ${compactMode ? 'p-3' : 'p-4'} border-b border-slate-700/50`}>
+            {/* Expand history (md+) placed at far-left near history area */}
+            {sidebarCollapsed && (
+              <button
+                className="hidden md:inline-flex items-center justify-center w-8 h-8 rounded-full border border-slate-400/30 text-slate-300 hover:text-white hover:border-slate-300 transition -ml-1"
+                onClick={toggleSidebarCollapsed}
+                aria-label="Expand history"
+                aria-controls="chat-history-panel"
+                aria-expanded={!sidebarCollapsed}
+                title="Expand history"
+              >
+                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M9 6l6 6-6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+            )}
             <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-cyan-500 rounded-full flex items-center justify-center text-white text-sm font-bold">🤖</div>
             <div className="flex flex-col">
               <h3 className={`${compactMode ? 'text-base' : 'text-lg'} font-semibold bg-gradient-to-r from-indigo-400 to-cyan-400 bg-clip-text text-transparent`}>
@@ -355,14 +385,9 @@ export function Chat() {
             </div>
             {/* Mobile: open history */}
             <div className="ml-auto flex items-center gap-2">
+              {/* Expand history button is placed on the far-left of header when collapsed */}
               <button className="md:hidden text-xs text-cyan-300 hover:text-white border border-cyan-400/30 rounded px-2 py-1" onClick={() => setShowDrawer(true)} aria-label="History">History</button>
-              {/* md+ controls */}
-              <button className="hidden md:inline text-xs text-slate-300 hover:text-white border border-slate-400/30 rounded px-2 py-1" onClick={toggleSidebarCollapsed} aria-label="Toggle sidebar">
-                {sidebarCollapsed ? 'Show Sidebar' : 'Hide Sidebar'}
-              </button>
-              <button className="text-xs text-cyan-300 hover:text-white border border-cyan-400/30 rounded px-2 py-1" onClick={toggleFullWidthChat} aria-label="Full width">
-                {fullWidthChat ? 'Exit Full Width' : 'Full Width'}
-              </button>
+              {/* md+ controls (sidebar toggle moved into sidebar) */}
               <button className="text-xs text-indigo-300 hover:text-white border border-indigo-400/30 rounded px-2 py-1" onClick={toggleCompactMode} aria-label="Compact mode">
                 {compactMode ? 'Comfort Mode' : 'Compact Mode'}
               </button>
@@ -424,10 +449,10 @@ export function Chat() {
           )}
 
           {/* Messages */}
-          <div ref={viewport} className={`flex-1 overflow-y-auto ${compactMode ? 'p-3' : 'p-4'} ${messageGap} scrollbar-thin scrollbar-track-slate-800 scrollbar-thumb-slate-600`}>
+          <div ref={viewport} className={`flex-1 overflow-y-auto ${compactMode ? 'p-3' : 'p-4'} ${messageGap} hover-scrollbar`}>
             {msgs.map((m, i) => (
               <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
-                <div className={`${sidebarCollapsed ? 'max-w-[98%]' : 'max-w-[92%]'} ${bubbleBase} ${
+                <div className={`${sidebarCollapsed ? 'max-w-[min(98%,760px)]' : 'max-w-[min(96%,760px)]'} ${bubbleBase} ${
                   m.role === "user" 
                     ? "bg-gradient-to-r from-indigo-600 to-cyan-600 text-white shadow-lg" 
                     : "bg-slate-800/80 border border-slate-700/50 text-slate-100 shadow-md"

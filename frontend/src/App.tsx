@@ -18,13 +18,22 @@ export default function App() {
 
   useEffect(()=>{
     // Subscribe to auth state changes for both clients (localStorage and sessionStorage clients)
-    const { data: { subscription: subA } } = supabase.auth.onAuthStateChange((_e, session)=>{
+    const { data: { subscription: subA } } = supabase.auth.onAuthStateChange((event, session)=>{
       setAuthed(!!session);
       setUser(session?.user || null);
+      // When the user signs out from any tab/client, clear any active conversation state
+      if (event === 'SIGNED_OUT') {
+        localStorage.removeItem('activeConversationId');
+        localStorage.removeItem('activeConversationTitle');
+      }
     });
-    const { data: { subscription: subB } } = supabaseSession.auth.onAuthStateChange((_e, session)=>{
+    const { data: { subscription: subB } } = supabaseSession.auth.onAuthStateChange((event, session)=>{
       setAuthed(!!session);
       setUser(session?.user || null);
+      if (event === 'SIGNED_OUT') {
+        localStorage.removeItem('activeConversationId');
+        localStorage.removeItem('activeConversationTitle');
+      }
     });
 
     // Initialize from either client that has an active session
@@ -51,17 +60,21 @@ export default function App() {
   await supabaseSession.auth.signOut();
   setAuthed(false);
   setUser(null);
+  localStorage.removeItem('activeConversationId');
+  localStorage.removeItem('activeConversationTitle');
   }
 
   if (!authed) return <Auth onAuthed={()=>setAuthed(true)} />;
   
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 relative">
+      <div className="absolute inset-0 bg-animated-gradient"></div>
+      <div className="absolute inset-0 bg-moving-clouds"></div>
       {/* Background decoration */}
       <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-indigo-400/15 rounded-full blur-3xl"></div>
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-cyan-400/15 rounded-full blur-3xl"></div>
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-purple-400/10 rounded-full blur-3xl"></div>
+        <div className="bg-orb absolute -top-40 -right-40 w-80 h-80 bg-indigo-400/15 rounded-full blur-3xl [animation-delay:0s] motion-reduce:[animation:none]"></div>
+        <div className="bg-orb absolute -bottom-40 -left-40 w-80 h-80 bg-cyan-400/15 rounded-full blur-3xl [animation-delay:3s] motion-reduce:[animation:none]"></div>
+        <div className="bg-orb absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-purple-400/10 rounded-full blur-3xl [animation-delay:6s] motion-reduce:[animation:none]"></div>
       </div>
       
   <div className="relative max-w-7xl mx-auto p-4 space-y-6">
