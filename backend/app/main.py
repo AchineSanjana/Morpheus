@@ -946,12 +946,15 @@ async def get_audio_status():
         
         cache_dir = Path("audio_cache")
         cache_files = list(cache_dir.glob("*.mp3")) + list(cache_dir.glob("*.wav"))
-        
+        status = audio_service.get_status() if hasattr(audio_service, 'get_status') else {}
         return {
             "service_available": True,
             "cache_directory": str(cache_dir),
             "cached_files_count": len(cache_files),
             "audio_settings": audio_service.settings,
+            "provider": status.get("provider"),
+            "selected_voice": status.get("selected_voice"),
+            "providers_available": status.get("providers_available"),
             "features": {
                 "text_to_speech": True,
                 "caching": True,

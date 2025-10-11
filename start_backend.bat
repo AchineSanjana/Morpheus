@@ -7,6 +7,11 @@ cd /d "C:\Users\admin\Desktop\sliit_work\Y3S1_DS\IRWA\Sleep improvemnt ai\Morphe
 echo 📁 Current directory: %CD%
 echo 🐍 Starting Python backend server...
 
+rem Activate venv if present
+if exist .venv\Scripts\activate.bat (
+    call .venv\Scripts\activate.bat
+)
+
 python start_backend.py
 
 if errorlevel 1 (

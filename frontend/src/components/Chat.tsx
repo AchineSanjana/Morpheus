@@ -15,30 +15,27 @@ type Msg = {
 };
 
 // Component for the Generate Audio button
-function GenerateAudioButton({ message, messageIndex, setMsgs }: { 
-  message: Msg; 
-  messageIndex: number; 
-  setMsgs: React.Dispatch<React.SetStateAction<Msg[]>>; 
+function GenerateAudioButton({ message, messageIndex, setMsgs }: {
+  message: Msg;
+  messageIndex: number;
+  setMsgs: React.Dispatch<React.SetStateAction<Msg[]>>;
 }) {
   const [isGenerating, setIsGenerating] = useState(false);
-  
-  // Check if this is a storyteller response that can have audio
-  const isStorytellerResponse = message.data?.agent === "storyteller";
-  
-  // Don't show button if audio already generated or not a story
-  if (!isStorytellerResponse || message.audioId || !message.content.trim()) {
-    return null;
-  }
+
+  // Only show for assistant storyteller messages without audio yet
+  const isStoryteller = typeof message?.data?.agent === 'string' && message.data.agent.toLowerCase() === 'storyteller';
+  if (message.role !== 'assistant' || !message.content || message.audioId || !isStoryteller) return null;
 
   const generateAudio = async () => {
-    setIsGenerating(true);
     try {
+      setIsGenerating(true);
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
-        throw new Error("Please sign in to generate audio");
+        throw new Error('Please sign in to generate audio');
       }
 
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/audio/generate`, {
+      const api = import.meta.env.VITE_API_URL as string;
+      const response = await fetch(`${api}/audio/generate`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -48,46 +45,42 @@ function GenerateAudioButton({ message, messageIndex, setMsgs }: {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to generate audio');
+        const text = await response.text().catch(() => '');
+        throw new Error(text || 'Failed to generate audio');
       }
 
       const audioData = await response.json();
 
       // Update the message with audio ID
-      setMsgs(msgs => {
-        const updatedMsgs = [...msgs];
-        updatedMsgs[messageIndex] = { 
-          ...updatedMsgs[messageIndex], 
-          audioId: audioData.audio_id 
+      setMsgs((prev) => {
+        const updatedMsgs = [...prev];
+        updatedMsgs[messageIndex] = {
+          ...updatedMsgs[messageIndex],
+          audioId: audioData.audio_id,
         };
         return updatedMsgs;
       });
-
     } catch (error: any) {
       console.error('Audio generation error:', error);
-      alert(error.message || 'Failed to generate audio');
+      alert(error?.message || 'Failed to generate audio');
     } finally {
       setIsGenerating(false);
     }
   };
 
   return (
-    <div className="mt-3">
+    <div className="mt-2 flex justify-end">
       <button
         onClick={generateAudio}
         disabled={isGenerating}
-        className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 disabled:from-gray-600 disabled:to-gray-700 text-white text-sm font-medium rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl disabled:cursor-not-allowed"
+        aria-label={isGenerating ? 'Generating audio...' : 'Generate audio'}
+        title={isGenerating ? 'Generating audio...' : 'Generate audio'}
+        className="w-10 h-10 rounded-full bg-gradient-to-r from-indigo-600 to-cyan-600 hover:from-indigo-500 hover:to-cyan-500 disabled:from-slate-600 disabled:to-slate-600 text-white flex items-center justify-center shadow-lg shadow-black/20 ring-1 ring-slate-700/60 transition-colors disabled:cursor-not-allowed"
       >
         {isGenerating ? (
-          <>
-            <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
-            <span>Generating Audio...</span>
-          </>
+          <div className="w-4 h-4 border-2 border-white/30 border-t-transparent rounded-full animate-spin" />
         ) : (
-          <>
-            <span className="text-lg">🎵</span>
-            <span>Generate Audio</span>
-          </>
+          <span className="text-lg">🔊</span>
         )}
       </button>
     </div>

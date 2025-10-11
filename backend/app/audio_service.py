@@ -8,6 +8,7 @@ import asyncio
 from concurrent.futures import ThreadPoolExecutor
 import time
 import json
+import re
 
 import httpx
 
@@ -25,6 +26,14 @@ except ImportError:
     GTTS_AVAILABLE = False
     gTTS = None
 
+# Optional Edge TTS (Microsoft neural voices similar to Google Assistant)
+try:
+    import edge_tts
+    EDGE_TTS_AVAILABLE = True
+except ImportError:
+    EDGE_TTS_AVAILABLE = False
+    edge_tts = None
+
 # Try to import audio processing libraries for gentle effects
 try:
     from pydub import AudioSegment
@@ -36,7 +45,7 @@ except ImportError:
     normalize = None
 
 ELEVENLABS_API_KEY_ENV = os.getenv("ELEVENLABS_API_KEY")
-TTS_AVAILABLE = PYTTSX3_AVAILABLE or GTTS_AVAILABLE or bool(ELEVENLABS_API_KEY_ENV)
+TTS_AVAILABLE = PYTTSX3_AVAILABLE or GTTS_AVAILABLE or bool(ELEVENLABS_API_KEY_ENV) or EDGE_TTS_AVAILABLE
 
 if not TTS_AVAILABLE:
     logging.warning("Text-to-speech libraries not available. Install pyttsx3 and gTTS for audio features.")
@@ -67,13 +76,21 @@ class AudioService:
             "pitch": -10,        # Slightly lower pitch for more soothing voice (was 0)
             "pause_multiplier": 1.5,  # Longer pauses between sentences
             "gentle_mode": True,  # Enable gentle speech patterns
-            # Neural TTS provider settings (optional, enabled when API key present)
+            # Provider preference (prefer Edge TTS neural voices if available)
+            "provider": os.getenv("TTS_PROVIDER") or ("edge-tts" if EDGE_TTS_AVAILABLE else ("pyttsx3" if PYTTSX3_AVAILABLE else ("gtts" if GTTS_AVAILABLE else "none"))),
+            # Edge TTS defaults (calming female voice similar to Google Assistant)
+            "edge_tts_voice": os.getenv("EDGE_TTS_VOICE", "en-US-JennyNeural"),
+            "edge_tts_rate": os.getenv("EDGE_TTS_RATE", "-10%"),
+            # Edge TTS pitch expects values like "+0Hz"/"-2Hz" (not percentage). Use a gentle, slightly lower pitch.
+            "edge_tts_pitch": os.getenv("EDGE_TTS_PITCH", "-2Hz"),
+            # ElevenLabs (kept for compatibility, not required)
             "neural_provider": os.getenv("ELEVENLABS_API_PROVIDER", "elevenlabs"),
             "elevenlabs_api_key": os.getenv("ELEVENLABS_API_KEY"),
-            # Default voice can be overridden via env: ELEVENLABS_VOICE_ID
-            "elevenlabs_voice_id": os.getenv("ELEVENLABS_VOICE_ID", "21m00Tcm4TlvDq8ikWAM"),  # Rachel (example)
-            # Model name; multilingual v2 is a good default for narration
+            "elevenlabs_voice_id": os.getenv("ELEVENLABS_VOICE_ID", "21m00Tcm4TlvDq8ikWAM"),
             "elevenlabs_model": os.getenv("ELEVENLABS_MODEL", "eleven_multilingual_v2"),
+            # Diagnostics for status
+            "selected_voice_name": None,
+            "selected_voice_id": None,
         }
         
         # Initialize TTS engine
@@ -106,7 +123,7 @@ class AudioService:
                 preferred_voices = []
                 
                 # Look for specifically gentle voices first
-                gentle_keywords = ['zira', 'hazel', 'susan', 'anna', 'emma', 'linda', 'natural', 'soft']
+                gentle_keywords = ['zira', 'hazel', 'susan', 'anna', 'emma', 'linda', 'natural', 'soft', 'jenny', 'aria', 'eva', 'olivia', 'sara']
                 for voice in voices:
                     if voice and voice.name:
                         voice_name_lower = voice.name.lower()
@@ -127,10 +144,14 @@ class AudioService:
                 if preferred_voices:
                     selected_voice = preferred_voices[0]
                     self.tts_engine.setProperty('voice', selected_voice.id)
+                    self.settings["selected_voice_name"] = getattr(selected_voice, 'name', None)
+                    self.settings["selected_voice_id"] = getattr(selected_voice, 'id', None)
                     logger.info(f"Selected gentle voice: {selected_voice.name}")
                 else:
                     # Fallback to first available voice
                     self.tts_engine.setProperty('voice', voices[0].id)
+                    self.settings["selected_voice_name"] = getattr(voices[0], 'name', None)
+                    self.settings["selected_voice_id"] = getattr(voices[0], 'id', None)
                     logger.info(f"Using fallback voice: {voices[0].name}")
                     
         except Exception as e:
@@ -228,8 +249,11 @@ class AudioService:
     
     def _get_cache_key(self, text: str, settings: Dict[str, Any]) -> str:
         """Generate cache key for audio file"""
-        provider = "elevenlabs" if settings.get("elevenlabs_api_key") else ("pyttsx3" if PYTTSX3_AVAILABLE else ("gtts" if GTTS_AVAILABLE else "none"))
-        content = f"{provider}_{settings.get('elevenlabs_voice_id','')}_{text}_{settings['speed']}_{settings['voice']}_{settings['language']}_{settings.get('pitch', 0)}_{settings.get('gentle_mode', False)}"
+        provider = settings.get("provider") or ("edge-tts" if EDGE_TTS_AVAILABLE else ("pyttsx3" if PYTTSX3_AVAILABLE else ("gtts" if GTTS_AVAILABLE else "none")))
+        voice_key = settings.get('edge_tts_voice') if provider == 'edge-tts' else (
+            settings.get('elevenlabs_voice_id') if provider == 'elevenlabs' else settings.get('selected_voice_id', '')
+        )
+        content = f"{provider}_{voice_key}_{text}_{settings['speed']}_{settings['voice']}_{settings['language']}_{settings.get('pitch', 0)}_{settings.get('gentle_mode', False)}"
         return hashlib.md5(content.encode()).hexdigest()
     
     async def text_to_speech_file(
@@ -264,26 +288,33 @@ class AudioService:
             return None
     
     async def _generate_audio_file(self, text: str, output_path: Path, format: str) -> Optional[str]:
-        """Generate audio file using available TTS engine"""
-        # Preprocess text for gentler speech. For neural voices (ElevenLabs), keep original text
-        # to avoid over-pausing; their prosody is already natural.
-        processed_text = self._preprocess_text_for_gentle_speech(text) if not self._use_neural else text
+        """Generate audio file using selected/available TTS engine"""
+        provider = self.settings.get("provider")
+        # For neural-like providers, keep original text to avoid over-pausing
+        processed_text = text if provider in ("edge-tts", "elevenlabs") else self._preprocess_text_for_gentle_speech(text)
 
-        # Prefer neural TTS if available (more natural)
-        if self._use_neural:
+        # Preferred: Edge TTS (smooth neural voice similar to Google Assistant)
+        if provider == "edge-tts" and EDGE_TTS_AVAILABLE:
+            try:
+                return await self._generate_with_edge_tts(processed_text, output_path, format)
+            except Exception as e:
+                logger.warning(f"Edge TTS failed, trying next provider: {e}")
+
+        # ElevenLabs (only if explicitly chosen and key present)
+        if provider == "elevenlabs" and self.settings.get("elevenlabs_api_key"):
             try:
                 return await self._generate_with_elevenlabs(processed_text, output_path, format)
             except Exception as e:
-                logger.warning(f"Neural TTS failed, falling back to local/legacy: {e}")
+                logger.warning(f"ElevenLabs failed, trying next provider: {e}")
 
-        # Try pyttsx3 first (offline, more natural for longer content)
+        # Offline/local pyttsx3
         if self.tts_engine:
             try:
                 return await self._generate_with_pyttsx3(processed_text, output_path)
             except Exception as e:
                 logger.warning(f"pyttsx3 failed, trying gTTS: {e}")
-        
-        # Fallback to gTTS (online, but good quality)
+
+        # Fallback: gTTS
         try:
             return await self._generate_with_gtts(processed_text, output_path, format)
         except Exception as e:
@@ -367,6 +398,42 @@ class AudioService:
             _ = self._apply_gentle_audio_effects(out_path)
         return out_path
     
+    async def _generate_with_edge_tts(self, text: str, output_path: Path, format: str) -> str:
+        """Generate audio using Edge TTS neural voices."""
+        if not EDGE_TTS_AVAILABLE:
+            raise Exception("edge-tts not available")
+
+        voice = self.settings.get("edge_tts_voice", "en-US-AriaNeural")
+        rate = self.settings.get("edge_tts_rate", "-10%")
+        pitch = self.settings.get("edge_tts_pitch", "-2Hz")
+
+        # Validate and normalize rate/pitch for edge-tts
+        # rate must be like "+0%" or "-10%"; pitch should be like "+0Hz"/"-2Hz"
+        if not isinstance(rate, str) or not re.match(r"^[+-]?\d+%$", rate):
+            logger.warning(f"Invalid Edge TTS rate '{rate}', falling back to -10%")
+            rate = "-10%"
+        if not isinstance(pitch, str) or not re.match(r"^[+-]?\d+Hz$", pitch):
+            logger.warning(f"Invalid Edge TTS pitch '{pitch}', falling back to -2Hz")
+            pitch = "-2Hz"
+
+        # Track selected voice
+        self.settings["selected_voice_name"] = voice
+        self.settings["selected_voice_id"] = voice
+
+        out_path = str(output_path.with_suffix(".mp3")) if output_path.suffix.lower() != ".mp3" else str(output_path)
+        if os.path.exists(out_path):
+            os.remove(out_path)
+
+        communicate = edge_tts.Communicate(text, voice=voice, rate=rate, pitch=pitch)
+        with open(out_path, "wb") as f:
+            async for chunk in communicate.stream():
+                if chunk["type"] == "audio":
+                    f.write(chunk["data"])
+
+        if os.path.exists(out_path):
+            _ = self._apply_gentle_audio_effects(out_path)
+        return out_path
+    
     async def _generate_with_gtts(self, text: str, output_path: Path, format: str) -> str:
         """Generate audio using Google TTS (online) with gentle settings and post-processing"""
         
@@ -377,7 +444,7 @@ class AudioService:
             tts = gTTS(
                 text=text, 
                 lang=self.settings["language"], 
-                slow=True,  # Always use slow speech for gentle bedtime stories
+                slow=False,  # Natural pacing; rely on light preprocessing
                 tld='com'   # Use .com domain for most natural voice
             )
             
@@ -412,6 +479,8 @@ class AudioService:
             "speech_rate": self.settings["speed"],
             "effective_speech_rate": int(effective_speed),
             "voice_settings": self.settings.copy(),
+            "provider": self.settings.get("provider"),
+            "selected_voice": self.settings.get("selected_voice_name"),
             "gentle_mode": self.settings.get("gentle_mode", False),
             "audio_effects": {
                 "gentle_processing": AUDIO_PROCESSING_AVAILABLE,
@@ -421,6 +490,23 @@ class AudioService:
             },
             "format": "mp3",
             "size_estimate_mb": round(estimated_duration * 0.1, 1)  # Rough estimate
+        }
+
+    def get_status(self) -> Dict[str, Any]:
+        """Expose provider/voice and feature flags for status endpoint."""
+        provider = self.settings.get("provider")
+        return {
+            "provider": provider,
+            "selected_voice": {
+                "name": self.settings.get("selected_voice_name"),
+                "id": self.settings.get("selected_voice_id"),
+            },
+            "providers_available": {
+                "edge_tts": EDGE_TTS_AVAILABLE,
+                "pyttsx3": PYTTSX3_AVAILABLE,
+                "gtts": GTTS_AVAILABLE,
+                "elevenlabs": bool(self.settings.get("elevenlabs_api_key")),
+            },
         }
     
     def cleanup_old_cache(self, max_age_days: int = 7):
