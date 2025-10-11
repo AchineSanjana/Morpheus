@@ -10,3 +10,4 @@ google-generativeai
 pyttsx3>=2.90
 gTTS>=2.3.0
 mutagen>=1.47.0
+pydub>=0.25.1

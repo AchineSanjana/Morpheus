@@ -7,8 +7,10 @@ import { Account } from "./components/Account";
 import PrivacyPolicy from "./components/PrivacyPolicy";
 import morpheusLogo from "./assets/morpheus_logo.jpg";
 import "./index.css";
+import { useLayout } from "./lib/LayoutContext";
 
 export default function App() {
+  const { fullWidthChat } = useLayout();
   const [authed,setAuthed]=useState(false);
   const [user, setUser] = useState<any>(null);
   const [showAccount, setShowAccount] = useState(false);
@@ -62,7 +64,7 @@ export default function App() {
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-purple-400/10 rounded-full blur-3xl"></div>
       </div>
       
-      <div className="relative max-w-3xl mx-auto p-4 space-y-6">
+  <div className="relative max-w-7xl mx-auto p-4 space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between p-4 bg-slate-900/80 backdrop-blur-xl border border-slate-700/50 rounded-2xl shadow-2xl">
           <div className="flex items-center gap-3">
@@ -97,7 +99,7 @@ export default function App() {
           </div>
         </div>
         
-        <SleepLogForm />
+  {!fullWidthChat && <SleepLogForm />}
         <Chat />
         
         {/* Footer */}

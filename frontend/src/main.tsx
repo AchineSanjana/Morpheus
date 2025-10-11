@@ -2,6 +2,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
+import { LayoutProvider } from './lib/LayoutContext';
 import ResetPassword from './components/ResetPassword'
 
 function shouldShowReset() {
@@ -19,6 +20,8 @@ const Root = shouldShowReset() ? <ResetPassword /> : <App />;
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    {Root}
+    <LayoutProvider>
+      {Root}
+    </LayoutProvider>
   </StrictMode>,
 )

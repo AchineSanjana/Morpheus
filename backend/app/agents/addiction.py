@@ -41,13 +41,24 @@ ADDICTION_PATTERNS = {
 }
 
 SUBSTANCE_PATTERNS = {
-    "caffeine": ["coffee", "tea", "energy drink", "caffeine", "espresso", "latte", "cappuccino", "red bull", "monster"],
+    "caffeine": [
+        "coffee", "coffe",  # include common typo
+        "tea", "energy drink",
+        "caffeine", "caffine", "caffiene", "cafine", "cafeine",  # common misspellings
+        "espresso", "latte", "cappuccino", "red bull", "monster"
+    ],
     "alcohol": ["wine", "beer", "vodka", "whiskey", "drinking", "alcohol", "cocktail", "rum", "gin", "tequila"],
     "nicotine": ["smoking", "cigarette", "vaping", "nicotine", "tobacco", "juul", "e-cigarette", "cigar"],
     "digital": ["phone", "social media", "scrolling", "screen time", "gaming", "netflix", "youtube", "tiktok", "instagram"]
 }
 
-TRIGGERS = ["addict", "dependen", "craving", "alcohol", "caffeine", "nicotine", "smoking", "withdrawal", "quit", "stop"]
+TRIGGERS = [
+    "addict",      # addicted / addiction
+    "dependen",    # dependent / dependency
+    "craving",     # cravings
+    "withdrawal",  # withdrawal symptoms
+    "quit",        # intent to quit
+]
 
 # Intervention levels for different severities
 INTERVENTION_LEVELS = {
@@ -77,6 +88,15 @@ class AddictionAgent(BaseAgent):
             return False
             
         t = message.lower()
+        # Neutral info-seeking phrasing should not trigger addiction by itself
+        neutral_info_phrases = [
+            "tell me about", "what is", "what are", "explain", "definition of",
+            "effects of", "effect of", "impact of", "how does", "why does"
+        ]
+        if any(p in t for p in neutral_info_phrases):
+            # Only consider addiction if explicit dependency cues also exist
+            if not any(trigger in t for trigger in TRIGGERS):
+                return False
         
         # Direct trigger words
         if any(trigger in t for trigger in TRIGGERS):
@@ -486,6 +506,7 @@ class AddictionAgent(BaseAgent):
         # Assess severity and substances
         severity, substances = self._assess_addiction_severity(message)
         
+        # If no specific substance detected, show a generic support chooser
         if not substances:
             return {
                 "agent": self.name,
@@ -669,7 +690,52 @@ class AddictionAgent(BaseAgent):
                 for resource in plan["resources"]:
                     plan_text += f"• {resource}\n"
                 plan_text += "\n"
+
+            # Add quick, practical suggestions regardless of severity or LLM response
+            quick_suggestions = self._get_quick_suggestions(substance)
+            if quick_suggestions:
+                plan_text += "**Quick Suggestions**:\n"
+                for tip in quick_suggestions:
+                    plan_text += f"• {tip}\n"
+                plan_text += "\n"
                 
             formatted_plans.append(plan_text)
         
         return "\n".join(formatted_plans) if formatted_plans else ""
+
+    def _get_quick_suggestions(self, substance: str) -> List[str]:
+        """Provide 3-5 actionable tips to begin cutting back today."""
+        s = (substance or "").lower()
+        if s == "caffeine":
+            return [
+                "Set a hard cutoff at least 6 hours before bedtime",
+                "Swap one daily coffee/energy drink for water or herbal tea",
+                "Keep decaf or low‑caffeine options ready for afternoon cravings",
+                "Track headaches and sleep for 1 week while reducing",
+                "Avoid caffeine on an empty stomach to reduce rebound cravings"
+            ]
+        if s == "alcohol":
+            return [
+                "Plan 3–5 alcohol‑free nights per week",
+                "Replace the evening drink with a relaxing ritual (tea, shower, reading)",
+                "Hydrate: 1 glass of water per alcoholic drink",
+                "Avoid alcohol within 3 hours of bedtime",
+                "Set a weekly limit and log drinks to stay accountable"
+            ]
+        if s == "nicotine":
+            return [
+                "Delay the first nicotine use by 30 minutes each day",
+                "Use nicotine replacement (patch/gum/lozenge) to taper safely",
+                "Identify and avoid evening trigger zones (sofa+phone, gaming setup)",
+                "Practice a 4‑7‑8 breath or short walk when an urge hits",
+                "Make the bedroom a nicotine‑free space"
+            ]
+        if s == "digital":
+            return [
+                "Create a phone‑free bedroom; charge the device outside",
+                "Set “No screens” 60 minutes before bed (use Focus/Do Not Disturb)",
+                "Switch phone to grayscale to reduce novelty seeking",
+                "Replace scrolling with a 10–15 minute wind‑down routine",
+                "Uninstall or log out of the most tempting apps before bedtime"
+            ]
+        return []

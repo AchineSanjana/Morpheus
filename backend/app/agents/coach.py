@@ -307,6 +307,7 @@ class CoachAgent(BaseAgent):
         # Generate personalized coaching response
         if analysis and logs:
             # Enhanced LLM prompt with comprehensive context and responsible AI guidelines
+            dn = (ctx or {}).get("display_name") or ""
             prompt = f"""
             You are Morpheus, an expert AI sleep coach with training in CBT-I (Cognitive Behavioral Therapy for Insomnia) and sleep science.
             
@@ -317,6 +318,7 @@ class CoachAgent(BaseAgent):
             - Be transparent about data usage and AI limitations
             - Respect privacy - don't expose sensitive personal details
             - Offer both free and accessible solutions alongside premium options
+            - Do not use nicknames or invented names for the user. If addressing the user by name, use this exact display name: {(dn or '').strip()}. Otherwise, address them neutrally as "you".
             
             A user is asking for sleep improvement guidance. Based on their comprehensive 14-day sleep analysis, create a detailed, personalized coaching response.
             
@@ -353,7 +355,7 @@ class CoachAgent(BaseAgent):
             
         else:
             # Fallback for users without sufficient data
-            llm_response = await self._generate_general_coaching_advice(message)
+            llm_response = await self._generate_general_coaching_advice(message, (ctx or {}).get("display_name"))
         
         # Compile final response
         final_sections = []
@@ -394,8 +396,9 @@ class CoachAgent(BaseAgent):
             "data": response_data
         }
 
-    async def _generate_general_coaching_advice(self, message: str) -> str:
+    async def _generate_general_coaching_advice(self, message: str, display_name: Optional[str] = None) -> str:
         """Generate general advice for users without sleep data."""
+        dn = (display_name or "").strip()
         prompt = f"""
         You are Morpheus, an AI sleep coach helping someone who hasn't logged detailed sleep data yet.
         
@@ -404,6 +407,7 @@ class CoachAgent(BaseAgent):
         - Provide both free and accessible solutions
         - Acknowledge individual differences
         - Be transparent that this is AI-generated advice
+        - Do not use nicknames or invented names for the user. If addressing the user by name, use this exact display name: {dn}. Otherwise, address them neutrally as "you".
         
         User's message: "{message}"
         

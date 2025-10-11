@@ -134,6 +134,23 @@ class AnalyticsAgent(BaseAgent):
         # Lifestyle factor analysis
         caffeine_nights = sum(1 for log in logs if log.get("caffeine_after3pm"))
         alcohol_nights = sum(1 for log in logs if log.get("alcohol"))
+        # Nicotine may not exist in schema; support common keys if present
+        nicotine_keys = ("nicotine", "nicotine_use", "tobacco", "smoked", "cigarettes")
+        def _has_nicotine(l: Dict[str, Any]) -> bool:
+            for k in nicotine_keys:
+                if k in l:
+                    v = l.get(k)
+                    # treat truthy bools or positive numbers as nicotine use
+                    if isinstance(v, (int, float)):
+                        if v > 0:
+                            return True
+                    elif isinstance(v, str):
+                        if v.strip().lower() in {"yes", "true", "y", "1"}:
+                            return True
+                    elif v:  # truthy
+                        return True
+            return False
+        nicotine_nights = sum(1 for log in logs if _has_nicotine(log))
         high_screen_nights = sum(1 for log in logs if log.get("screen_time_min", 0) > 60)
         
         if caffeine_nights > len(logs) * 0.5:
@@ -142,7 +159,15 @@ class AnalyticsAgent(BaseAgent):
         
         if alcohol_nights > len(logs) * 0.3:
             insights["notable_patterns"].append(f"Alcohol consumption on {alcohol_nights}/{len(logs)} nights")
-            insights["recommendations"].append("Consider alcohol's impact on sleep quality")
+            insights["recommendations"].append("Consider alcohol's impact on sleep quality; avoid alcohol 3–4 hours before bed")
+
+        # Nicotine insights (if any nicotine data is present in logs)
+        if nicotine_nights > 0:
+            if nicotine_nights > len(logs) * 0.3:
+                insights["concerns"].append(f"Nicotine use on {nicotine_nights}/{len(logs)} nights")
+                insights["recommendations"].append("Avoid nicotine within 3–4 hours of bedtime; reduce overall use for sleep quality")
+            else:
+                insights["notable_patterns"].append(f"Occasional nicotine use on {nicotine_nights}/{len(logs)} nights")
         
         if high_screen_nights > len(logs) * 0.4:
             insights["concerns"].append(f"Excessive screen time ({high_screen_nights}/{len(logs)} nights >60min)")
@@ -150,10 +175,10 @@ class AnalyticsAgent(BaseAgent):
         
         return insights
 
-    def _generate_trend_analysis(self, logs: List[Dict[str, Any]]) -> str:
-        """Generate trend analysis text."""
+    def _generate_trend_analysis(self, logs: List[Dict[str, Any]]) -> List[str]:
+        """Generate trend analysis as a list of individual trends."""
         if len(logs) < 3:
-            return "Need more data for trend analysis."
+            return ["Need more data for trend analysis"]
         
         # Analyze recent vs older data
         mid_point = len(logs) // 2
@@ -180,7 +205,7 @@ class AnalyticsAgent(BaseAgent):
                 direction = "increased" if awakening_change > 0 else "decreased"
                 trends.append(f"Night awakenings have {direction} recently")
         
-        return "; ".join(trends) if trends else "Sleep patterns are relatively stable"
+        return trends if trends else ["Sleep patterns are relatively stable"]
 
     async def _handle_core(self, message: str, ctx: Optional[AgentContext] = None) -> AgentResponse:
         """Generate comprehensive 7-day sleep analytics with trends and insights."""
@@ -199,6 +224,22 @@ class AnalyticsAgent(BaseAgent):
         screen_time = [r.get("screen_time_min", 0) for r in logs]
         bedtimes = [_to_dt(r.get("bedtime")) for r in logs if _to_dt(r.get("bedtime"))]
         waketimes = [_to_dt(r.get("wake_time")) for r in logs if _to_dt(r.get("wake_time"))]
+
+        # Lifestyle factors (explicitly compute alcohol and nicotine series)
+        alcohol_flags = [bool(r.get("alcohol")) for r in logs]
+        nicotine_keys = ("nicotine", "nicotine_use", "tobacco", "smoked", "cigarettes")
+        def _has_nicotine(l: Dict[str, Any]) -> bool:
+            for k in nicotine_keys:
+                if k in l:
+                    v = l.get(k)
+                    if isinstance(v, (int, float)) and v > 0:
+                        return True
+                    if isinstance(v, str) and v.strip().lower() in {"yes", "true", "y", "1"}:
+                        return True
+                    if isinstance(v, bool) and v:
+                        return True
+            return False
+        nicotine_flags = [_has_nicotine(r) for r in logs]
 
         # Calculate core metrics
         avg_duration = _avg(durations_h)
@@ -219,61 +260,128 @@ class AnalyticsAgent(BaseAgent):
         insights = self._identify_patterns_and_insights(logs)
         trend_analysis = self._generate_trend_analysis(logs)
         
-        # Build comprehensive report
-        report_sections = []
+    # Build comprehensive report as a single formatted string
+        report_parts = []
         
         # Header
-        report_sections.append(f"📊 **7-Day Sleep Analysis** ({len(logs)} nights logged)")
+        report_parts.append(f"📊 **7-Day Sleep Analysis** ({len(logs)} nights logged)\n")
         
-        # Core Metrics
-        metrics = []
+        # Core Metrics Section
+        report_parts.append("**📈 Key Metrics:**\n")
         if avg_duration:
             quality = "excellent" if avg_duration >= 8 else "good" if avg_duration >= 7 else "needs improvement"
-            metrics.append(f"⏱️ **Sleep Duration**: {avg_duration}h avg ({quality})")
+            report_parts.append(f"• **Sleep Duration**: {avg_duration}h avg ({quality}) 🌙\n")
         
         if avg_awakenings is not None:
             quality = "excellent" if avg_awakenings <= 1 else "good" if avg_awakenings <= 2 else "concerning"
-            metrics.append(f"🌙 **Night Awakenings**: {avg_awakenings} avg ({quality})")
+            report_parts.append(f"• **Night Awakenings**: {avg_awakenings} avg ({quality}) 💤\n")
         
         if sleep_efficiency:
             quality = "excellent" if sleep_efficiency >= 85 else "good" if sleep_efficiency >= 75 else "needs improvement"
-            metrics.append(f"💤 **Sleep Efficiency**: {sleep_efficiency}% ({quality})")
+            report_parts.append(f"• **Sleep Efficiency**: {sleep_efficiency}% ({quality}) 🎯\n")
         
         if avg_screen_time is not None:
             quality = "good" if avg_screen_time <= 30 else "moderate" if avg_screen_time <= 60 else "high"
-            metrics.append(f"📱 **Pre-bed Screen Time**: {avg_screen_time}min ({quality})")
+            report_parts.append(f"• **Pre-bed Screen Time**: {avg_screen_time}min ({quality}) 📱\n")
+
+        # Alcohol & Nicotine summary
+        alcohol_nights = sum(1 for f in alcohol_flags if f)
+        nicotine_nights = sum(1 for f in nicotine_flags if f)
+        report_parts.append("\n**🍷 Alcohol & 🚬 Nicotine:**\n")
+        report_parts.append(f"• **Alcohol nights**: {alcohol_nights}/{len(logs)}\n")
+        if any(nicotine_flags):
+            report_parts.append(f"• **Nicotine nights**: {nicotine_nights}/{len(logs)}\n")
+        else:
+            report_parts.append("• **Nicotine nights**: no data logged\n")
+
+        # Optional correlation snapshots
+        def _avg_on(mask: List[bool], series: List[float]) -> Optional[float]:
+            vals = [series[i] for i, m in enumerate(mask) if m and series[i] is not None]
+            return round(sum(vals)/len(vals), 2) if vals else None
+        def _avg_on_int(mask: List[bool], series: List[int]) -> Optional[float]:
+            vals = [series[i] for i, m in enumerate(mask) if m]
+            return round(sum(vals)/len(vals), 2) if vals else None
+
+        if len(logs) >= 3:
+            dur_on_alc = _avg_on(alcohol_flags, [r.get("duration_h") for r in logs])
+            dur_off_alc = _avg_on([not f for f in alcohol_flags], [r.get("duration_h") for r in logs])
+            awk_on_alc = _avg_on_int(alcohol_flags, [int(r.get("awakenings", 0)) for r in logs])
+            awk_off_alc = _avg_on_int([not f for f in alcohol_flags], [int(r.get("awakenings", 0)) for r in logs])
+            alc_corr_lines = []
+            if dur_on_alc is not None and dur_off_alc is not None:
+                diff = round(dur_on_alc - dur_off_alc, 2)
+                if abs(diff) >= 0.2:
+                    direction = "shorter" if diff < 0 else "longer"
+                    alc_corr_lines.append(f"On alcohol nights, sleep tends to be {abs(diff)}h {direction}.")
+            if awk_on_alc is not None and awk_off_alc is not None:
+                diff = round(awk_on_alc - awk_off_alc, 2)
+                if abs(diff) >= 0.3:
+                    direction = "more" if diff > 0 else "fewer"
+                    alc_corr_lines.append(f"On alcohol nights, there are {abs(diff)} {direction} awakenings.")
+            if alc_corr_lines:
+                report_parts.append("\n**🔍 Alcohol correlation:**\n" + "\n".join(f"• {l}" for l in alc_corr_lines) + "\n")
+
+            if any(nicotine_flags):
+                dur_on_nic = _avg_on(nicotine_flags, [r.get("duration_h") for r in logs])
+                dur_off_nic = _avg_on([not f for f in nicotine_flags], [r.get("duration_h") for r in logs])
+                awk_on_nic = _avg_on_int(nicotine_flags, [int(r.get("awakenings", 0)) for r in logs])
+                awk_off_nic = _avg_on_int([not f for f in nicotine_flags], [int(r.get("awakenings", 0)) for r in logs])
+                nic_corr_lines = []
+                if dur_on_nic is not None and dur_off_nic is not None:
+                    diff = round(dur_on_nic - dur_off_nic, 2)
+                    if abs(diff) >= 0.2:
+                        direction = "shorter" if diff < 0 else "longer"
+                        nic_corr_lines.append(f"On nicotine nights, sleep tends to be {abs(diff)}h {direction}.")
+                if awk_on_nic is not None and awk_off_nic is not None:
+                    diff = round(awk_on_nic - awk_off_nic, 2)
+                    if abs(diff) >= 0.3:
+                        direction = "more" if diff > 0 else "fewer"
+                        nic_corr_lines.append(f"On nicotine nights, there are {abs(diff)} {direction} awakenings.")
+                if nic_corr_lines:
+                    report_parts.append("\n**🔍 Nicotine correlation:**\n" + "\n".join(f"• {l}" for l in nic_corr_lines) + "\n")
         
-        report_sections.extend(metrics)
-        
-        # Consistency Analysis
-        report_sections.append("\n⏰ **Schedule Consistency**:")
+        # Schedule Consistency Section
+        report_parts.append("\n**⏰ Schedule Consistency:**\n")
         if bedtime_consistency:
-            report_sections.append(f"  • Bedtime: {bedtime_consistency['description']} (±{bedtime_consistency['avg_deviation']}min)")
+            report_parts.append(f"• **Bedtime**: {bedtime_consistency['description']} (±{bedtime_consistency['avg_deviation']}min)\n")
         if waketime_consistency:
-            report_sections.append(f"  • Wake Time: {waketime_consistency['description']} (±{waketime_consistency['avg_deviation']}min)")
+            report_parts.append(f"• **Wake Time**: {waketime_consistency['description']} (±{waketime_consistency['avg_deviation']}min)\n")
         
-        # Trends
-        if trend_analysis and trend_analysis != "Sleep patterns are relatively stable":
-            report_sections.append(f"\n📈 **Recent Trends**: {trend_analysis}")
+        # Recent Trends Section
+        if trend_analysis and trend_analysis != ["Sleep patterns are relatively stable"]:
+            report_parts.append("\n**📈 Recent Trends:**\n")
+            for trend in trend_analysis:
+                report_parts.append(f"• {trend}\n")
         
-        # Insights
+        # Strengths Section
         if insights["strengths"]:
-            report_sections.append(f"\n🏆 **Strengths**: {', '.join(insights['strengths'])}")
+            report_parts.append("\n**🏆 Strengths:**\n")
+            for strength in insights["strengths"]:
+                report_parts.append(f"• {strength}\n")
         
+        # Areas for Improvement Section
         if insights["concerns"]:
-            report_sections.append(f"\n⚠️ **Areas for Improvement**: {'; '.join(insights['concerns'])}")
+            report_parts.append("\n**⚠️ Areas for Improvement:**\n")
+            for concern in insights["concerns"]:
+                report_parts.append(f"• {concern}\n")
         
+        # Notable Patterns Section
         if insights["notable_patterns"]:
-            report_sections.append(f"\n📋 **Notable Patterns**: {'; '.join(insights['notable_patterns'])}")
+            report_parts.append("\n**📋 Notable Patterns:**\n")
+            for pattern in insights["notable_patterns"]:
+                report_parts.append(f"• {pattern}\n")
         
-        # Recommendations
+        # Recommendations Section
         if insights["recommendations"]:
-            report_sections.append(f"\n🎯 **Recommendations**:")
+            report_parts.append("\n**🎯 Recommendations:**\n")
             for rec in insights["recommendations"][:3]:  # Limit to top 3
-                report_sections.append(f"  • {rec}")
+                report_parts.append(f"• {rec}\n")
         
         # Footer
-        report_sections.append("\n💡 *Ask me about specific sleep challenges for personalized coaching!*")
+        report_parts.append("\n💡 *Ask me about specific sleep challenges for personalized coaching!*")
+        
+        # Join all parts into final report
+        final_report = "".join(report_parts)
         
         # Create summary data for other agents
         summary = {
@@ -285,11 +393,13 @@ class AnalyticsAgent(BaseAgent):
             "bedtime_consistency": bedtime_consistency,
             "waketime_consistency": waketime_consistency,
             "insights": insights,
+            "alcohol_nights": alcohol_nights,
+            "nicotine_nights": nicotine_nights,
             "trends": trend_analysis
         }
         
         return {
             "agent": self.name, 
-            "text": "\n".join(report_sections),
+            "text": final_report,
             "data": {"summary": summary, "logs": logs[-3:]}  # Include recent logs for context
         }

@@ -33,18 +33,31 @@ class CoordinatorAgent(BaseAgent):
         self.story = StoryTellerAgent()
 
     def _intent_keyword(self, msg: str) -> str:
-        """Fallback keyword-based intent detection."""
+        """Fallback keyword-based intent detection with addiction gating."""
         t = (msg or "").lower()
+        # Analytics
         if any(k in t for k in ["analy", "trend", "week", "report", "summary", "insight"]):
             return "analytics"
+
+        # Addiction only when explicit dependency/quit cues exist
+        try:
+            if self.addiction._detect_addiction_context(msg):
+                return "addiction"
+        except Exception:
+            pass
+
+        # Neutral info queries (topics like caffeine/alcohol/nicotine/screens)
+        if any(k in t for k in [
+            "caffeine", "coffee", "alcohol", "nicotine", "smoking", "screen", "screens",
+            "explain", "what is", "define", "tell me about", "effect of", "impact of"
+        ]):
+            return "information"
+
+        # Coaching
         if any(k in t for k in ["plan", "tips", "improve", "advice", "coach"]):
             return "coach"
-        if any(k in t for k in ["caffeine", "coffee", "screen", "explain", "what is", "define", "tell me about"]):
-            return "information"
-        # Add addiction detection
-        if any(k in t for k in ["addict", "dependen", "craving", "alcohol", "nicotine", "smoking", "drinking", "quit", "stop", "withdrawal", "too much coffee", "too much alcohol"]):
-            return "addiction"
-        return "coach"  # default: help them with advice
+
+        return "coach"  # default
 
     async def _intent_llm(self, message: str) -> Optional[str]:
         """
@@ -55,12 +68,12 @@ class CoordinatorAgent(BaseAgent):
             return None
 
         prompt = (
-            "You route user sleep questions to one of these agents:\n"
-            "- analytics: analyze past sleep data, trends, summaries, reports\n"
-            "- coach: give advice, plans, tips, how to improve sleep\n"
-            "- information: factual info/definitions about sleep topics (caffeine, alcohol, screens, etc.)\n"
-            "- addiction: help with addiction/dependency issues (caffeine, alcohol, nicotine, digital)\n"
-            "- storyteller: tell a calming, short bedtime story\n\n"
+            "Route the user's sleep message to exactly one agent:\n"
+            "- analytics: analyze past data, trends, summaries, reports\n"
+            "- coach: advice, plans, tips to improve sleep\n"
+            "- information: neutral facts/definitions about topics (caffeine, alcohol, nicotine, screens, etc.)\n"
+            "- addiction: ONLY if message indicates dependency or quitting (e.g., 'addicted', 'can't stop', 'withdrawal', 'craving', 'too much', 'need to quit')\n"
+            "- storyteller: short calming bedtime story\n\n"
             f"User message: \"{message}\"\n\n"
             "Respond with just one word: analytics, coach, information, addiction, or storyteller."
         )
@@ -81,7 +94,17 @@ class CoordinatorAgent(BaseAgent):
         if not cleaned:
             return None
         choice = cleaned[0]
-        return choice if choice in _ALLOWED else None
+        if choice not in _ALLOWED:
+            return None
+
+        # Guard: demote false-positive addiction unless explicit dependency cues exist
+        if choice == "addiction" and not self.addiction._detect_addiction_context(message):
+            t = (message or "").lower()
+            if any(k in t for k in ["caffeine", "coffee", "alcohol", "nicotine", "smoking", "screen", "screens"]):
+                return "information"
+            return "coach"
+
+        return choice
 
     async def _handle_core(self, message: str, ctx: Optional[AgentContext] = None) -> AgentResponse:
         ctx = ctx or {}
@@ -90,8 +113,10 @@ class CoordinatorAgent(BaseAgent):
         # Greeting / first message
         if not (message or "").strip() or (message or "").strip().lower() in {"hi", "hello", "hey"}:
             menu = "\n".join(WELCOME_MENU)
+            dn = (ctx.get("display_name") or "").strip()
+            name_part = f" {dn}" if dn else ""
             text = (
-                f"Hi{' ' + user.get('email') if user else ''}! I’m your sleep coordinator.\n\n"
+                f"Hi{name_part}! I’m your sleep coordinator.\n\n"
                 f"Here are some things you can try:\n{menu}\n\n"
                 f"Or just ask in your own words — I’ll route it to the right agent."
             )

@@ -84,6 +84,16 @@ htmlcov/
 .pytype/
 ipynb_checkpoints/
 
+# Audio cache files
+audio_cache/
+*.mp3
+*.wav
+
+# Temporary debug files
+*debug_*.py
+*demo_*.py
+*fix_*.py
+
 # Java / JVM
 target/
 *.jar

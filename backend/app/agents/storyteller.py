@@ -192,6 +192,7 @@ class StoryTellerAgent(BaseAgent):
         self.action_type = "storytelling"  # For responsible AI context
         self.story_preferences = {}  # Track user preferences (encrypted)
         self.story_history = []  # Track recent stories for variety
+        self.recent_story_hashes: List[str] = []  # Track hashes of recent AI stories to avoid repeats
         self.security_validator = SecurityValidator()
         self.audio_enabled = True  # Enable audio features
 
@@ -210,11 +211,13 @@ class StoryTellerAgent(BaseAgent):
         
         message_lower = sanitized_message.lower() if sanitized_message else ""
         
-        # Extract theme preferences
+        # Extract theme preferences; if none detected, choose one randomly for variety
         for theme in STORY_THEMES.keys():
             if theme in message_lower or any(element in message_lower for element in STORY_THEMES[theme]["elements"]):
                 preferences["theme"] = theme
                 break
+        if not preferences["theme"]:
+            preferences["theme"] = random.choice(list(STORY_THEMES.keys()))
         
         # Extract length preferences
         if any(word in message_lower for word in ["short", "brief", "quick"]):
@@ -243,20 +246,20 @@ class StoryTellerAgent(BaseAgent):
         
         return preferences
 
-    def _build_enhanced_prompt(self, preferences: Dict[str, Any], user_name: Optional[str]) -> str:
+    def _build_enhanced_prompt(self, preferences: Dict[str, Any], user_name: Optional[str], variation_token: str) -> str:
         """Build an enhanced prompt based on user preferences with security checks"""
         length_info = STORY_LENGTHS[preferences["length"]]
-        
+
         prompt = f"{SYSTEM_STYLE_BASE}\n\n"
         prompt += f"Write a {preferences['length']} bedtime story ({length_info['words']} words). "
-        
+
         # Add length-specific guidance
         if preferences["length"] in ["medium", "long", "extended"]:
             prompt += "For this longer story, include: multiple gentle scenes, "
             prompt += "rich sensory descriptions, character development, "
             prompt += "a clear but gentle progression, and several peaceful moments. "
             prompt += "Take time to build atmosphere and create a immersive, calming experience. "
-        
+
         # Add theme guidance (pre-validated themes only)
         if preferences["theme"] and preferences["theme"] in STORY_THEMES:
             theme_data = STORY_THEMES[preferences["theme"]]
@@ -264,21 +267,27 @@ class StoryTellerAgent(BaseAgent):
             prompt += f"Consider incorporating elements like: {', '.join(theme_data['elements'][:3])}. "
             prompt += f"Possible characters: {', '.join(theme_data['characters'][:2])}. "
             prompt += f"Settings might include: {', '.join(theme_data['settings'][:2])}. "
-        
+
         # Add custom topic (already sanitized)
         if preferences["custom_topic"]:
             prompt += f"The story should be about: {preferences['custom_topic']}. "
-        
+
         # Add name instruction (sanitized name)
         sanitized_name = self.security_validator.sanitize_user_name(user_name) if user_name else None
         if preferences["include_name"] and sanitized_name:
             prompt += f"The listener's name is {sanitized_name}. Include their name gently in the story. "
-        
+
         prompt += "\nRemember: Keep the tone peaceful and sleep-inducing. "
         prompt += "Use sensory details that promote relaxation. "
         prompt += "End with a gentle conclusion that encourages rest and peaceful dreams. "
         prompt += "Do not include any personal information, scary content, or inappropriate material."
-        
+
+        # Add a variation token to encourage distinct choices each request
+        prompt += (
+            f"\nVariation token: {variation_token}. Use this token to make unique choices of character names, "
+            f"locations, and gentle motifs so stories differ across requests. Do not reuse the exact same plot "
+            f"or character names between different variation tokens."
+        )
         return prompt
 
     def _select_fallback_story(self) -> str:
@@ -331,8 +340,10 @@ class StoryTellerAgent(BaseAgent):
             # Extract story preferences from sanitized input
             preferences = self._extract_story_preferences(sanitized_message, ctx)
             
-            # Build enhanced prompt with security checks
-            prompt = self._build_enhanced_prompt(preferences, user_name)
+            # Build enhanced prompt with security checks and variation token for diversity
+            var_seed = f"{datetime.utcnow().isoformat()}_{random.randint(0, 1_000_000)}"
+            variation_token = hashlib.sha256(var_seed.encode()).hexdigest()[:8]
+            prompt = self._build_enhanced_prompt(preferences, user_name, variation_token)
             
             # Try to generate story with AI
             story_text = ""
@@ -340,22 +351,34 @@ class StoryTellerAgent(BaseAgent):
             
             if gemini_ready():
                 try:
-                    story_text = await generate_gemini_text(
-                        prompt, 
-                        model_name="gemini-2.0-flash-exp"
-                    )
-                    
-                    # Validate AI output for security and appropriateness
-                    if (story_text and 
-                        len(story_text.strip()) > 50 and 
-                        self.security_validator.validate_story_output(story_text)):
-                        generation_method = "ai_generated"
-                        logger.info(f"Story generated successfully - Length: {len(story_text)} chars, "
-                                  f"Hash: {self.security_validator.hash_for_logging(story_text)}")
+                    # Attempt up to 2 generations to avoid repeats
+                    for attempt in range(2):
+                        candidate = await generate_gemini_text(
+                            prompt
+                        ) or ""
+                        candidate_clean = candidate.strip()
+
+                        if (candidate_clean and len(candidate_clean) > 50 and self.security_validator.validate_story_output(candidate_clean)):
+                            # Check against recent story hashes to avoid repeats
+                            cand_hash = hashlib.sha256(candidate_clean[:500].encode()).hexdigest()[:16]
+                            if self.recent_story_hashes and cand_hash == self.recent_story_hashes[-1]:
+                                # Generate a fresh token and retry once
+                                if attempt == 0:
+                                    var_seed = f"{datetime.utcnow().isoformat()}_{random.randint(0, 1_000_000)}_retry"
+                                    variation_token = hashlib.sha256(var_seed.encode()).hexdigest()[:8]
+                                    prompt = self._build_enhanced_prompt(preferences, user_name, variation_token)
+                                    continue
+                            story_text = candidate_clean
+                            generation_method = "ai_generated"
+                            logger.info(
+                                f"Story generated successfully - Length: {len(story_text)} chars, "
+                                f"Hash: {self.security_validator.hash_for_logging(story_text)}"
+                            )
+                            break
+                        else:
+                            logger.warning("AI-generated story failed validation, trying fallback or retry")
                     else:
-                        logger.warning("AI-generated story failed validation, using fallback")
                         story_text = ""
-                        
                 except Exception as e:
                     logger.warning(f"Story generation failed: {str(e)[:100]}")  # Limit error message length
                     story_text = ""
@@ -399,6 +422,13 @@ class StoryTellerAgent(BaseAgent):
                 }
             }
             
+            # Track recent AI story hash to reduce repetition
+            if generation_method == "ai_generated" and story_text:
+                story_hash = hashlib.sha256(story_text[:500].encode()).hexdigest()[:16]
+                self.recent_story_hashes.append(story_hash)
+                if len(self.recent_story_hashes) > 5:
+                    self.recent_story_hashes = self.recent_story_hashes[-5:]
+
             return {
                 "agent": self.name,
                 "text": story_text,

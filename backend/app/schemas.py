@@ -3,6 +3,7 @@ from typing import Optional, Any, Dict
 
 class ChatRequest(BaseModel):
     message: str
+    conversation_id: Optional[str] = None  # Optional conversation thread id
 
 class SleepLogIn(BaseModel):
     date: str
