@@ -207,6 +207,82 @@ class AnalyticsAgent(BaseAgent):
         
         return trends if trends else ["Sleep patterns are relatively stable"]
 
+    def _generate_predictive_insights(self, logs: List[Dict[str, Any]], summary: Dict[str, Any]) -> str:
+        """Generate predictive insights based on recent patterns"""
+        insights = []
+        
+        # Trend-based predictions
+        recent_logs = logs[-3:] if len(logs) >= 3 else logs
+        duration_trend = self._calculate_trend([log.get("duration_h", 0) for log in logs[-7:] if log.get("duration_h")])
+        
+        if duration_trend == "improving":
+            insights.append("• Your sleep duration trend is **improving** - maintain current habits!")
+        elif duration_trend == "worsening":
+            insights.append("• Your sleep duration is **declining** - consider earlier bedtimes")
+        
+        # Lifestyle factor predictions
+        recent_caffeine = sum(1 for log in recent_logs if log.get("caffeine_after3pm"))
+        recent_alcohol = sum(1 for log in recent_logs if log.get("alcohol"))
+        
+        if recent_caffeine > len(recent_logs) * 0.5:
+            insights.append("• **Risk alert:** Frequent late caffeine may continue impacting sleep quality")
+        
+        if recent_alcohol > 0:
+            insights.append("• **Consider:** Alcohol-free nights to improve sleep depth and continuity")
+        
+        # Weekly pattern prediction
+        avg_duration = summary.get("avg_duration", 0)
+        if avg_duration > 0:
+            if avg_duration >= 7.5:
+                insights.append("• **Forecast:** Continue current routine for sustained good sleep")
+            elif avg_duration < 6.5:
+                insights.append("• **Recommendation:** Add 30-60 minutes to nightly sleep target")
+        
+        # Consistency prediction
+        bedtime_consistency = summary.get("bedtime_consistency", {}).get("rating", "")
+        if bedtime_consistency == "needs improvement":
+            insights.append("• **Focus area:** Improving schedule consistency will enhance sleep quality")
+        
+        return "\n".join(insights) if insights else "Continue tracking for personalized predictions!"
+
+    def _generate_predictive_insights(self, logs: List[Dict[str, Any]], summary: Dict[str, Any]) -> str:
+        """Generate predictive insights based on recent patterns"""
+        insights = []
+        
+        # Trend-based predictions
+        recent_logs = logs[-3:] if len(logs) >= 3 else logs
+        duration_trend = self._calculate_trend([log.get("duration_h", 0) for log in logs[-7:] if log.get("duration_h")])
+        
+        if duration_trend == "improving":
+            insights.append("• Your sleep duration trend is **improving** - maintain current habits!")
+        elif duration_trend == "worsening":
+            insights.append("• Your sleep duration is **declining** - consider earlier bedtimes")
+        
+        # Lifestyle factor predictions
+        recent_caffeine = sum(1 for log in recent_logs if log.get("caffeine_after3pm"))
+        recent_alcohol = sum(1 for log in recent_logs if log.get("alcohol"))
+        
+        if recent_caffeine > len(recent_logs) * 0.5:
+            insights.append("• **Risk alert:** Frequent late caffeine may continue impacting sleep quality")
+        
+        if recent_alcohol > 0:
+            insights.append("• **Consider:** Alcohol-free nights to improve sleep depth and continuity")
+        
+        # Weekly pattern prediction
+        avg_duration = summary.get("avg_duration", 0)
+        if avg_duration > 0:
+            if avg_duration >= 7.5:
+                insights.append("• **Forecast:** Continue current routine for sustained good sleep")
+            elif avg_duration < 6.5:
+                insights.append("• **Recommendation:** Add 30-60 minutes to nightly sleep target")
+        
+        # Consistency prediction
+        bedtime_consistency = summary.get("bedtime_consistency", {}).get("rating", "")
+        if bedtime_consistency == "needs improvement":
+            insights.append("• **Focus area:** Improving schedule consistency will enhance sleep quality")
+        
+        return "\n".join(insights) if insights else "Continue tracking for personalized predictions!"
+
     async def _handle_core(self, message: str, ctx: Optional[AgentContext] = None) -> AgentResponse:
         """Generate comprehensive 7-day sleep analytics with trends and insights."""
         ctx = ctx or {}
@@ -397,6 +473,11 @@ class AnalyticsAgent(BaseAgent):
             "nicotine_nights": nicotine_nights,
             "trends": trend_analysis
         }
+        
+        # Add predictive insights if we have enough data
+        if len(logs) >= 7:
+            predictive_insights = self._generate_predictive_insights(logs, summary)
+            final_report += f"\n\n**🔮 Predictive Insights:**\n{predictive_insights}\n"
         
         return {
             "agent": self.name, 

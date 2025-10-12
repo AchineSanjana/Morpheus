@@ -315,6 +315,12 @@ export function Chat() {
     return lc.includes("i'm here to help with addiction concerns") || lc.includes("what would you like support with today?");
   }
 
+  // Detect if a message is the coordinator welcome menu
+  function isWelcomeMenu(content: string) {
+    const lc = content.toLowerCase();
+    return lc.includes("sleep coordinator") && (lc.includes("here are some things you can try") || lc.includes("predict tonight's sleep"));
+  }
+
   const bubbleBase = compactMode ? 'rounded-xl px-3 py-2 text-[13px] leading-[1.45]' : 'rounded-2xl px-4 py-3 text-sm leading-relaxed';
   // Use fixed height instead of flex-1 to enable proper scrolling
   const containerHeight = 'h-[800px] min-h-[500px] max-h-[90vh]';
@@ -501,6 +507,35 @@ export function Chat() {
                               onClick={() => sendQuick(opt.value)}
                               disabled={loading}
                               className="text-xs text-indigo-300 hover:text-white bg-indigo-500/10 hover:bg-indigo-500/20 px-3 py-1.5 rounded-lg border border-indigo-400/20 transition-colors disabled:opacity-60"
+                            >
+                              {opt.label}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Quick-select buttons for Welcome/Coordinator menu */}
+                      {m.content && isWelcomeMenu(m.content) && (
+                        <div className="flex flex-wrap gap-2 pt-2">
+                          <div className="w-full text-xs text-slate-400 mb-1">💡 Quick Actions:</div>
+                          {[
+                            { label: "🔮 Predict Tonight", value: "How will I sleep tonight?", color: "purple" },
+                            { label: "⏰ Optimal Bedtime", value: "What's my optimal bedtime?", color: "blue" },
+                            { label: "📊 Analyze 7 Days", value: "Analyze my last 7 days", color: "green" },
+                            { label: "💡 Sleep Tips", value: "Give me a 7-day improvement plan", color: "yellow" },
+                            { label: "📖 Bedtime Story", value: "Tell me a bedtime story", color: "pink" }
+                          ].map((opt, idx) => (
+                            <button
+                              key={idx}
+                              onClick={() => sendQuick(opt.value)}
+                              disabled={loading}
+                              className={`text-xs hover:text-white px-3 py-1.5 rounded-lg border transition-colors disabled:opacity-60 ${
+                                opt.color === 'purple' ? 'text-purple-300 bg-purple-500/10 hover:bg-purple-500/20 border-purple-400/20' :
+                                opt.color === 'blue' ? 'text-blue-300 bg-blue-500/10 hover:bg-blue-500/20 border-blue-400/20' :
+                                opt.color === 'green' ? 'text-green-300 bg-green-500/10 hover:bg-green-500/20 border-green-400/20' :
+                                opt.color === 'yellow' ? 'text-yellow-300 bg-yellow-500/10 hover:bg-yellow-500/20 border-yellow-400/20' :
+                                'text-pink-300 bg-pink-500/10 hover:bg-pink-500/20 border-pink-400/20'
+                              }`}
                             >
                               {opt.label}
                             </button>

@@ -7,18 +7,21 @@ from .information import InformationAgent
 from .nutrition import NutritionAgent
 from .addiction import AddictionAgent
 from .storyteller import StoryTellerAgent
+from .prediction import SleepPredictionAgent
 from app.llm_gemini import generate_gemini_text, gemini_ready  # Import the Gemini helper
 
 WELCOME_MENU = [
-    "• Log last night’s sleep",
+    "• Log last night's sleep",
     "• Analyze my last 7 days",
     "• Give me a 7-day improvement plan",
+    "• Predict tonight's sleep quality",
+    "• Get optimal bedtime recommendation",
     "• What do reputable sources say about caffeine/screens/bedtime?",
     "• Get lifestyle guidance from my logs (caffeine/alcohol)",
     "• Tell me a bedtime story",
 ]
 
-_ALLOWED = {"analytics", "coach", "information", "nutrition", "storyteller", "addiction"}
+_ALLOWED = {"analytics", "coach", "information", "nutrition", "storyteller", "addiction", "prediction"}
 
 class CoordinatorAgent(BaseAgent):
     name = "coordinator"
@@ -32,6 +35,7 @@ class CoordinatorAgent(BaseAgent):
         self.addiction = AddictionAgent() #Amath
         self.info = InformationAgent()
         self.story = StoryTellerAgent()
+        self.prediction = SleepPredictionAgent()
 
     def _intent_keyword(self, msg: str) -> str:
         """Fallback keyword-based intent detection with addiction gating."""
@@ -39,6 +43,10 @@ class CoordinatorAgent(BaseAgent):
         # Analytics
         if any(k in t for k in ["analy", "trend", "week", "report", "summary", "insight"]):
             return "analytics"
+
+        # Prediction keywords
+        if any(k in t for k in ["predict", "tonight", "tomorrow", "quality", "bedtime", "when should", "optimal"]):
+            return "prediction"
 
         # Addiction only when explicit dependency/quit cues exist
         try:
@@ -81,9 +89,10 @@ class CoordinatorAgent(BaseAgent):
             "- information: neutral facts/definitions about topics (sleep science, caffeine/alcohol/screens in general)\n"
             "- nutrition: personalized lifestyle guidance using the user's logs (caffeine timing, alcohol days, exercise); use only when the user seeks personal advice or refers to their logs or own habits\n"
             "- addiction: ONLY if message indicates dependency or quitting (e.g., 'addicted', 'can't stop', 'withdrawal', 'craving', 'too much', 'need to quit')\n"
+            "- prediction: sleep quality predictions, bedtime recommendations, forecasting tonight's sleep\n"
             "- storyteller: short calming bedtime story\n\n"
             f"User message: \"{message}\"\n\n"
-            "Respond with just one word: analytics, coach, information, nutrition, addiction, or storyteller."
+            "Respond with just one word: analytics, coach, information, nutrition, addiction, prediction, or storyteller."
         )
 
         try:
@@ -165,6 +174,9 @@ class CoordinatorAgent(BaseAgent):
 
         if intent == "addiction":
             return await self.addiction.handle(message, ctx)
+
+        if intent == "prediction":
+            return await self.prediction.handle(message, ctx)
 
         # Default safety: coach
         return await self.coach.handle(message, ctx)
