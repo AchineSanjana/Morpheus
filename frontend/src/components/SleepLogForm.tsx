@@ -165,7 +165,7 @@ export function SleepLogForm() {
       {/* Background gradient overlay */}
       <div className="absolute inset-0 bg-gradient-to-br from-indigo-400/10 via-transparent to-cyan-400/10 rounded-2xl blur-xl"></div>
       
-      <form onSubmit={submit} className="relative bg-gradient-to-br from-slate-900/95 to-slate-800/95 backdrop-blur-sm border border-slate-700/50 p-6 rounded-2xl mb-6 space-y-6 shadow-2xl shadow-black/20" aria-describedby="sleep-form-status">
+  <form onSubmit={submit} className="relative bg-gradient-to-br from-slate-900/95 to-slate-800/95 border border-slate-700/50 p-6 rounded-2xl mb-6 space-y-6 shadow-2xl shadow-black/20" aria-describedby="sleep-form-status">
         {/* Header */}
         <div className="flex items-center gap-3 pb-2 border-b border-slate-700/50">
           <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-cyan-500 rounded-full flex items-center justify-center text-white text-sm font-bold">💤</div>

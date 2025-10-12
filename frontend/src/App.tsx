@@ -67,7 +67,8 @@ export default function App() {
   if (!authed) return <Auth onAuthed={()=>setAuthed(true)} />;
   
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 relative">
+    <div className="min-h-svh bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 relative pt-safe pb-safe flex flex-col">
+      <div className="absolute inset-0 bg-aurora"></div>
       <div className="absolute inset-0 bg-animated-gradient"></div>
       <div className="absolute inset-0 bg-moving-clouds"></div>
       {/* Background decoration */}
@@ -77,10 +78,10 @@ export default function App() {
         <div className="bg-orb absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-purple-400/10 rounded-full blur-3xl [animation-delay:6s] motion-reduce:[animation:none]"></div>
       </div>
       
-  <div className="relative max-w-7xl mx-auto p-4 space-y-6">
+  <div className="relative max-w-7xl mx-auto px-3 sm:px-4 py-3 sm:py-4 space-y-4 sm:space-y-6 flex-1 min-h-0 flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between p-4 bg-slate-900/80 backdrop-blur-xl border border-slate-700/50 rounded-2xl shadow-2xl">
-          <div className="flex items-center gap-3">
+  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between p-3 sm:p-4 bg-slate-900/80 border border-slate-700/50 rounded-2xl shadow-2xl">
+          <div className="flex items-center gap-2 sm:gap-3">
             <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-cyan-500 rounded-xl flex items-center justify-center overflow-hidden p-1">
               <img 
                 src={morpheusLogo} 
@@ -88,10 +89,10 @@ export default function App() {
                 className="w-full h-full object-contain rounded-lg"
               />
             </div>
-            <h1 className="text-2xl font-bold bg-gradient-to-r from-indigo-400 to-cyan-400 bg-clip-text text-transparent">Morpheus</h1>
+            <h1 className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-indigo-400 to-cyan-400 bg-clip-text text-transparent">Morpheus</h1>
           </div>
-          <div className="flex items-center gap-3">
-            <span className="text-sm text-slate-400">{user?.email}</span>
+          <div className="flex items-center gap-2 sm:gap-3">
+            <span className="hidden sm:inline text-sm text-slate-400">{user?.email}</span>
             <button
               onClick={() => setShowAccount(true)}
               className="text-sm text-cyan-400 hover:text-cyan-300 px-3 py-1 rounded-lg hover:bg-cyan-400/10 transition-colors flex items-center gap-2"
@@ -113,11 +114,14 @@ export default function App() {
         </div>
         
   {!fullWidthChat && <SleepLogForm />}
-        <Chat />
+        {/* Chat fills remaining vertical space on small screens only */}
+        <div className="flex-1 min-h-0 md:flex-none">
+          <Chat />
+        </div>
         
-        {/* Footer */}
-        <div className="text-center">
-          <p className="text-xs text-slate-500 bg-slate-900/50 backdrop-blur-sm px-4 py-2 rounded-xl border border-slate-700/30">
+  {/* Footer (sticks to bottom when there's space) */}
+  <div className="text-center mt-auto">
+          <p className="text-xs text-slate-500 bg-slate-900/60 px-4 py-2 rounded-xl border border-slate-700/30">
             Not medical advice. If you have ongoing sleep issues, consult a clinician.
           </p>
           <div className="mt-2">

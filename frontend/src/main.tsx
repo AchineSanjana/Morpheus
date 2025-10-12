@@ -18,10 +18,27 @@ function shouldShowReset() {
 
 const Root = shouldShowReset() ? <ResetPassword /> : <App />;
 
+// Enable performance-lite mode automatically on low-end devices or when user prefers reduced motion
+const rootClasses: string[] = []
+try {
+  // Prefer reduced motion => disable heavy animations
+  if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    rootClasses.push('perf-lite')
+  }
+  // Device memory hint (not supported everywhere)
+  // @ts-ignore
+  const mem = navigator.deviceMemory as number | undefined
+  if (typeof mem === 'number' && mem <= 4) {
+    rootClasses.push('perf-lite')
+  }
+} catch {}
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <LayoutProvider>
-      {Root}
-    </LayoutProvider>
+    <div className={rootClasses.join(' ')}>
+      <LayoutProvider>
+        {Root}
+      </LayoutProvider>
+    </div>
   </StrictMode>,
 )

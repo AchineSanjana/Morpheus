@@ -106,7 +106,8 @@ export function Auth({ onAuthed }:{ onAuthed:()=>void }) {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 flex items-center justify-center p-4 relative">
+    <div className="min-h-svh bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 flex items-center justify-center px-3 sm:px-4 py-4 relative pt-safe pb-safe">
+      <div className="absolute inset-0 bg-aurora"></div>
       <div className="absolute inset-0 bg-animated-gradient"></div>
       <div className="absolute inset-0 bg-moving-clouds"></div>
       {/* Background decoration */}
@@ -118,7 +119,7 @@ export function Auth({ onAuthed }:{ onAuthed:()=>void }) {
 
       <div className="relative w-full max-w-md">
         {/* Main auth card */}
-        <div className="bg-slate-900/85 backdrop-blur-xl border border-slate-700/50 rounded-2xl p-8 shadow-2xl">
+  <div className="bg-slate-900/85 border border-slate-700/50 rounded-2xl p-8 shadow-2xl">
           {/* Header */}
           <div className="text-center mb-8">
             <div className="w-16 h-16 bg-gradient-to-br from-indigo-500 to-cyan-500 rounded-2xl flex items-center justify-center mb-4 mx-auto overflow-hidden p-1">

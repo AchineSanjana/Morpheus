@@ -3,6 +3,16 @@
 :root { color-scheme: dark; }
 body { background:#0a0a0a; color:#e5e5e5; margin:0; }
 
+/* Safe area helpers for mobile devices with notches */
+.pt-safe { padding-top: max(env(safe-area-inset-top, 0px), 0px); }
+.pb-safe { padding-bottom: max(env(safe-area-inset-bottom, 0px), 0px); }
+.pl-safe { padding-left: max(env(safe-area-inset-left, 0px), 0px); }
+.pr-safe { padding-right: max(env(safe-area-inset-right, 0px), 0px); }
+
+/* Height helper using small viewport to avoid URL bar jumps */
+.h-svh { height: 100svh; }
+.min-h-svh { min-height: 100svh; }
+
 /* Animated background orbs */
 @keyframes orbFloat {
 	0%   { transform: translate3d(0,0,0) scale(1); }
@@ -36,8 +46,8 @@ body { background:#0a0a0a; color:#e5e5e5; margin:0; }
 		rgba(99, 102, 241, 0.10)
 	);
 		background-size: 300% 300%;
-		/* Shorter cycle for quicker color shift */
-		animation: gradientShift 2s ease-in-out infinite;
+		/* Longer cycle and lower cost */
+		animation: gradientShift 18s ease-in-out infinite;
 	pointer-events: none;
 }
 @media (prefers-reduced-motion: reduce) {
@@ -87,11 +97,57 @@ body { background:#0a0a0a; color:#e5e5e5; margin:0; }
 		60% 60%,  /* fuchsia */
 		75% 75%,  /* emerald */
 		55% 55%;  /* blue */
-	animation: cloudsMove 24s ease-in-out infinite;
-	pointer-events: none;
+	/* Slow down to reduce repaints */
+	animation: cloudsMove 40s ease-in-out infinite;
+	pointer-events: auto;
 }
 @media (prefers-reduced-motion: reduce) {
 	.bg-moving-clouds { animation: none; }
+}
+
+/* Aurora-style conic gradient sweep */
+@keyframes auroraSweep {
+	0%   { --ang: 0deg; }
+	100% { --ang: 360deg; }
+}
+.bg-aurora {
+	/* Use a CSS variable angle to animate conic gradient */
+	--ang: 0deg;
+	background-image: conic-gradient(from var(--ang),
+		rgba(99,102,241,0.10), /* indigo */
+		rgba(34,211,238,0.08), /* cyan */
+		rgba(168,85,247,0.10), /* purple */
+		rgba(59,130,246,0.08), /* blue */
+		rgba(16,185,129,0.08), /* emerald */
+		rgba(217,70,239,0.08), /* fuchsia */
+		rgba(99,102,241,0.10)
+	);
+	/* Slow down conic gradient sweep */
+	animation: auroraSweep 30s linear infinite;
+	background-blend-mode: screen;
+	mix-blend-mode: plus-lighter;
+	pointer-events: auto;
+}
+@media (prefers-reduced-motion: reduce) {
+	.bg-aurora { animation: none; }
+}
+
+/* Performance mode: disable costly effects if parent has .perf-lite */
+.perf-lite .bg-aurora,
+.perf-lite .bg-animated-gradient,
+.perf-lite .bg-moving-clouds,
+.perf-lite .bg-orb {
+	animation: none !important;
+}
+.perf-lite .bg-aurora {
+	background-image: none !important;
+}
+.perf-lite .blur-3xl,
+.perf-lite .backdrop-blur-sm,
+.perf-lite .backdrop-blur-xl {
+	filter: none !important;
+	-webkit-backdrop-filter: none !important;
+	backdrop-filter: none !important;
 }
 
 /* Hover-reveal scrollbar with zero layout shift: reserve space via padding and swap to real scrollbar on hover */

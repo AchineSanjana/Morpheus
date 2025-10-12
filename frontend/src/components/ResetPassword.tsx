@@ -82,7 +82,7 @@ export default function ResetPassword() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-zinc-900 via-zinc-800 to-zinc-900 flex items-center justify-center p-4">
       <div className="relative w-full max-w-md">
-        <div className="bg-zinc-900/80 backdrop-blur-xl border border-zinc-700/50 rounded-2xl p-8 shadow-2xl">
+  <div className="bg-zinc-900/80 border border-zinc-700/50 rounded-2xl p-8 shadow-2xl">
           <div className="text-center mb-6">
             <h2 className="text-xl font-semibold">Set a new password</h2>
             <p className="text-sm text-zinc-400 mt-2">Enter a new password for your account.</p>

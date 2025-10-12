@@ -304,15 +304,14 @@ export function Chat() {
   }
 
   const bubbleBase = compactMode ? 'rounded-xl px-3 py-2 text-[13px] leading-[1.45]' : 'rounded-2xl px-4 py-3 text-sm leading-relaxed';
-  const containerHeight = compactMode ? 'h-[100vh]' : 'h-[100vh]';
+  // Fill available space only on narrow screens; on md+ let content size naturally
+  const containerHeight = 'flex-1 min-h-0 md:flex-none';
   const messageGap = compactMode ? 'space-y-3' : 'space-y-4';
 
   return (
     <div className="relative">
-      {/* Background gradient overlay */}
-      <div className="absolute inset-0 bg-gradient-to-br from-indigo-400/10 via-transparent to-cyan-400/10 rounded-2xl blur-xl"></div>
-      
-  <div className={`relative flex flex-col md:flex-row ${containerHeight} bg-gradient-to-br from-slate-900/95 to-slate-800/95 backdrop-blur-sm border border-slate-700/50 rounded-2xl shadow-2xl shadow-black/20`}>
+  {/* Simplified background for performance (removed heavy blur filter). Flex to fill parent height. */}
+  <div className={`relative flex flex-col md:flex-row ${containerHeight} bg-gradient-to-br from-slate-900/95 to-slate-800/95 border border-slate-700/50 rounded-2xl shadow-2xl shadow-black/20`}>
   {/* Sidebar: Conversations */}
         <div id="chat-history-panel" className={`${sidebarCollapsed ? 'hidden' : 'hidden md:flex'} md:w-80 flex-col border-r border-slate-700/50 p-3 gap-2 overflow-y-auto hover-scrollbar`} aria-label="Conversations">
           <div className="flex items-center justify-between mb-1">
@@ -358,7 +357,7 @@ export function Chat() {
           </div>
         </div>
         {/* Right panel: header + messages + status + input stacked */}
-        <div className="flex-1 flex flex-col min-w-0">
+  <div className="flex-1 min-h-0 flex flex-col min-w-0">
           {/* Header */}
           <div className={`flex items-center gap-3 ${compactMode ? 'p-3' : 'p-4'} border-b border-slate-700/50`}>
             {/* Expand history (md+) placed at far-left near history area */}
@@ -449,7 +448,7 @@ export function Chat() {
           )}
 
           {/* Messages */}
-          <div ref={viewport} className={`flex-1 overflow-y-auto ${compactMode ? 'p-3' : 'p-4'} ${messageGap} hover-scrollbar`}>
+          <div ref={viewport} className={`flex-1 min-h-0 overflow-y-auto ${compactMode ? 'p-3' : 'p-4'} ${messageGap} hover-scrollbar`}>
             {msgs.map((m, i) => (
               <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
                 <div className={`${sidebarCollapsed ? 'max-w-[min(98%,760px)]' : 'max-w-[min(96%,760px)]'} ${bubbleBase} ${
@@ -536,7 +535,7 @@ export function Chat() {
           )}
 
           {/* Input area */}
-          <div className={`${compactMode ? 'p-3' : 'p-4'} border-t border-slate-700/50 bg-slate-900/50`}>
+          <div className={`${compactMode ? 'p-3' : 'p-4'} border-t border-slate-700/50 bg-slate-900/50 pb-safe`}> 
             <div className="flex gap-3">
               <div className="flex-1 relative">
                 <input 
