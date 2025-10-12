@@ -75,26 +75,25 @@ async def get_profile(user_id: str, authorization: str = Header(default="")):
     def _fetch_or_create():
         print(f"Attempting to fetch profile for user_id: {user_id}")
         try:
-            # Try to fetch existing profile
+            # Try to fetch existing profile (should exist due to database trigger)
             result = supabase.table("user_profile").select("*").eq("id", user_id).single().execute()
             print(f"Profile fetch result: {result}")
             if result.data:
                 print(f"Found existing profile: {result.data}")
                 return result.data
             else:
-                print("No profile data returned, will create new profile")
+                print("No profile data returned, will create as fallback")
                 raise Exception("No rows returned")
         except Exception as e:
             print(f"Profile fetch error: {e}")
             error_str = str(e).lower()
             if "no rows returned" in error_str or "not found" in error_str or "pgrst116" in error_str:
-                # Profile doesn't exist, create one
-                print("Creating new profile...")
+                # Profile doesn't exist - this shouldn't happen with the trigger, but create as fallback
+                print("Creating profile as fallback (trigger may have failed)...")
                 try:
-                    # Get user email from auth user data for better defaults
                     user_email = user.get("email", "")
                     username = user_email.split("@")[0] if user_email else f"user_{user_id[:8]}"
-                    print(f"Creating profile with username: {username} for email: {user_email}")
+                    print(f"Creating fallback profile with username: {username} for email: {user_email}")
                     
                     new_profile = {
                         "id": user_id,
@@ -102,19 +101,18 @@ async def get_profile(user_id: str, authorization: str = Header(default="")):
                         "username": username,
                         "avatar_url": None
                     }
-                    print(f"Inserting profile: {new_profile}")
+                    print(f"Inserting fallback profile: {new_profile}")
                     create_result = supabase.table("user_profile").insert(new_profile).execute()
-                    print(f"Profile creation result: {create_result}")
+                    print(f"Fallback profile creation result: {create_result}")
                     
                     if create_result.data and len(create_result.data) > 0:
-                        print(f"Successfully created profile: {create_result.data[0]}")
+                        print(f"Successfully created fallback profile: {create_result.data[0]}")
                         return create_result.data[0]
                     else:
-                        print("No data returned from profile creation")
+                        print("No data returned from fallback profile creation")
                         return new_profile
                 except Exception as create_error:
-                    print(f"Failed to create profile: {create_error}")
-                    print(f"Create error type: {type(create_error)}")
+                    print(f"Failed to create fallback profile: {create_error}")
                     raise create_error
             else:
                 print(f"Non-recoverable database error: {e}")
@@ -206,6 +204,47 @@ async def check_table(authorization: str = Header(default="")):
         return check_result
     except Exception as e:
         return {"table_exists": False, "error": str(e)}
+
+@app.get("/debug/profile-stats")
+async def profile_stats(authorization: str = Header(default="")):
+    """Debug endpoint to check if automatic profile creation is working"""
+    user = await get_current_user(authorization.replace("Bearer ", ""))
+    if not user:
+        raise HTTPException(401, "Unauthorized")
+    
+    def _get_stats():
+        try:
+            # Count total auth users
+            auth_count_result = supabase.rpc('count_auth_users').execute()
+            total_auth_users = auth_count_result.data if auth_count_result.data else 0
+            
+            # Count total profiles  
+            profile_result = supabase.table("user_profile").select("id", count="exact").execute()
+            total_profiles = profile_result.count if hasattr(profile_result, 'count') else len(profile_result.data or [])
+            
+            # Get recent profiles
+            recent_profiles = supabase.table("user_profile").select("id, username, created_at").order("created_at", desc=True).limit(5).execute()
+            
+            # Check if trigger exists
+            trigger_check = supabase.rpc('check_trigger_exists', {'trigger_name': 'on_auth_user_created'}).execute()
+            trigger_exists = trigger_check.data if trigger_check.data else False
+            
+            return {
+                "total_auth_users": total_auth_users,
+                "total_profiles": total_profiles,
+                "profiles_vs_users_match": total_auth_users == total_profiles,
+                "recent_profiles": recent_profiles.data,
+                "trigger_exists": trigger_exists,
+                "automatic_creation_working": total_auth_users == total_profiles
+            }
+        except Exception as e:
+            return {"error": str(e), "details": "Could not fetch profile statistics"}
+    
+    try:
+        stats = await run_in_threadpool(_get_stats)
+        return stats
+    except Exception as e:
+        return {"error": str(e)}
 
 @app.post("/profile/{user_id}/avatar")
 async def upload_avatar(

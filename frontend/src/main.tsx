@@ -8,11 +8,39 @@ import ResetPassword from './components/ResetPassword'
 function shouldShowReset() {
   try {
     const u = new URL(window.location.href);
-    // If the provider appended type=recovery or there's an access_token in the hash/search
-    if (u.searchParams.get('type') === 'recovery') return true;
-    if (u.searchParams.get('access_token')) return true;
-    if (u.hash && u.hash.includes('access_token')) return true;
-  } catch (e) {}
+    
+    // Check URL parameters from both search and hash
+    const searchParams = u.searchParams;
+    const hashParams = new URLSearchParams(u.hash.startsWith('#') ? u.hash.substring(1) : '');
+    
+    // Get type from either search or hash
+    const typeFromSearch = searchParams.get('type');
+    const typeFromHash = hashParams.get('type');
+    const type = typeFromSearch || typeFromHash;
+    
+    // Only show reset password page for actual password recovery
+    // Email confirmations should redirect to main app
+    if (type === 'recovery') {
+      // Check if this is a password reset (has access_token) or just email confirmation
+      const hasAccessToken = searchParams.get('access_token') || hashParams.get('access_token');
+      if (hasAccessToken) {
+        return true; // This is a password reset with token
+      }
+    }
+    
+    // For email confirmations (type=signup or no access_token), go to main app
+    if (type === 'signup' || type === 'email_change') {
+      return false; // Let the main app handle email confirmations
+    }
+    
+    // Fallback: if there's an access_token without type, it's likely a password reset
+    if (searchParams.get('access_token') || hashParams.get('access_token')) {
+      return true;
+    }
+    
+  } catch (e) {
+    console.error('Error parsing URL for reset detection:', e);
+  }
   return false;
 }
 

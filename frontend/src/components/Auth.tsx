@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { supabase, supabaseSession } from "../lib/supabaseClient";
 import morpheusLogo from "../assets/morpheus_logo.jpg";
 import PrivacyPolicy from "./PrivacyPolicy";
+import TermsAndConditions from "./TermsAndConditions";
 
 export function Auth({ onAuthed }:{ onAuthed:()=>void }) {
   const [email,setEmail]=useState(""); 
@@ -12,6 +13,43 @@ export function Auth({ onAuthed }:{ onAuthed:()=>void }) {
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
   const [showPrivacy, setShowPrivacy] = useState(false);
+  const [showTerms, setShowTerms] = useState(false);
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [confirmationMessage, setConfirmationMessage] = useState<string | null>(null);
+
+  // Handle email confirmations from URL parameters
+  useEffect(() => {
+    const handleUrlParams = () => {
+      try {
+        const u = new URL(window.location.href);
+        const searchParams = u.searchParams;
+        const hashParams = new URLSearchParams(u.hash.startsWith('#') ? u.hash.substring(1) : '');
+        
+        const type = searchParams.get('type') || hashParams.get('type');
+        const accessToken = searchParams.get('access_token') || hashParams.get('access_token');
+        
+        if (type === 'signup' && accessToken) {
+          // Email confirmation for new signup
+          setConfirmationMessage("Email confirmed successfully! Please sign in to continue. ✅");
+          setMode("signin"); // Switch to signin mode
+          // Clear URL parameters
+          window.history.replaceState({}, document.title, window.location.pathname);
+          // Clear message after 8 seconds
+          setTimeout(() => setConfirmationMessage(null), 8000);
+        } else if (type === 'email_change' && accessToken) {
+          // Email change confirmation
+          setConfirmationMessage("Email updated successfully! Please sign in with your new email. ✅");
+          setMode("signin"); // Switch to signin mode
+          window.history.replaceState({}, document.title, window.location.pathname);
+          setTimeout(() => setConfirmationMessage(null), 8000);
+        }
+      } catch (e) {
+        console.error('Error handling URL parameters:', e);
+      }
+    };
+
+    handleUrlParams();
+  }, []);
 
   // Clear stored password when rememberMe is unchecked
   useEffect(() => {
@@ -60,6 +98,11 @@ export function Auth({ onAuthed }:{ onAuthed:()=>void }) {
     setStatus({type:"idle"});
 
     if (mode==="signup"){
+      if (!acceptedTerms) {
+        setStatus({type:"error", msg: "You must accept the Terms and Conditions to create an account."});
+        setLoading(false);
+        return;
+      }
       const {error}=await supabase.auth.signUp({ email, password });
       if (error) {
         setStatus({type:"error", msg: error.message});
@@ -144,6 +187,7 @@ export function Auth({ onAuthed }:{ onAuthed:()=>void }) {
               onClick={() => {
                 setMode("signin"); 
                 setStatus({type:"idle"});
+                setAcceptedTerms(false);
                 // Clear password when switching to signin to allow fresh login
                 if (mode !== "signin") setPassword("");
               }}
@@ -160,6 +204,7 @@ export function Auth({ onAuthed }:{ onAuthed:()=>void }) {
               onClick={() => {
                 setMode("signup"); 
                 setStatus({type:"idle"});
+                setAcceptedTerms(false);
                 // Clear password when switching to signup for security
                 setPassword("");
               }}
@@ -232,6 +277,38 @@ export function Auth({ onAuthed }:{ onAuthed:()=>void }) {
                 </label>
               )}
 
+              {/* Terms and Conditions acceptance for signup */}
+              {mode === "signup" && (
+                <label htmlFor="acceptTerms" className="flex items-start gap-3 text-sm">
+                  <input
+                    id="acceptTerms"
+                    type="checkbox"
+                    checked={acceptedTerms}
+                    onChange={(e) => setAcceptedTerms(e.target.checked)}
+                    className="w-4 h-4 mt-1 accent-cyan-500"
+                    required
+                  />
+                  <span className="text-slate-400 leading-relaxed">
+                    I agree to the{" "}
+                    <button
+                      type="button"
+                      onClick={() => setShowTerms(true)}
+                      className="text-cyan-400 hover:text-cyan-300 underline"
+                    >
+                      Terms and Conditions
+                    </button>
+                    {" "}and{" "}
+                    <button
+                      type="button"
+                      onClick={() => setShowPrivacy(true)}
+                      className="text-cyan-400 hover:text-cyan-300 underline"
+                    >
+                      Privacy Policy
+                    </button>
+                  </span>
+                </label>
+              )}
+
               {/* (moved) */}
             </div>
             {/* Inline row: Remember me (left) and Forgot password (right) */}
@@ -258,6 +335,14 @@ export function Auth({ onAuthed }:{ onAuthed:()=>void }) {
               </div>
             )}
 
+            {/* Email confirmation message */}
+            {confirmationMessage && (
+              <div className="flex items-center gap-2 p-3 rounded-xl text-sm bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 animate-in slide-in-from-top-2 duration-300">
+                <span>✅</span>
+                <span>{confirmationMessage}</span>
+              </div>
+            )}
+
             {/* Status messages */}
             {status.type !== "idle" && (
               <div className={`flex items-center gap-2 p-3 rounded-xl text-sm ${
@@ -272,7 +357,7 @@ export function Auth({ onAuthed }:{ onAuthed:()=>void }) {
 
             {/* Submit button */}
             <button
-              disabled={loading || !email || (mode !== "reset" && !password)}
+              disabled={loading || !email || (mode !== "reset" && !password) || (mode === "signup" && !acceptedTerms)}
               className="w-full bg-gradient-to-r from-indigo-600 to-cyan-600 disabled:from-slate-600 disabled:to-slate-600 disabled:cursor-not-allowed hover:from-indigo-500 hover:to-cyan-500 py-3 rounded-xl text-sm font-medium transition-all duration-200 shadow-lg hover:shadow-xl disabled:shadow-none transform hover:scale-[1.02] disabled:scale-100 flex items-center justify-center gap-2"
             >
               {loading ? (
@@ -315,15 +400,10 @@ export function Auth({ onAuthed }:{ onAuthed:()=>void }) {
                 </>
               )}
             </p>
-            <p className="text-xs text-slate-600 text-center mt-3">
-              By continuing, you agree to our Terms of Service and
-              <button
-                type="button"
-                onClick={() => setShowPrivacy(true)}
-                className="ml-1 text-slate-300 hover:text-slate-200 underline"
-              >
-                Privacy Policy
-              </button>
+           <p className="text-xs text-slate-600 text-center mt-3">
+              {/* Legal notice: Terms and Privacy Policy */}
+              By continuing, you agree to our Terms of Service and Privacy Policy.
+              
             </p>
           </div>
         </div>
@@ -352,6 +432,26 @@ export function Auth({ onAuthed }:{ onAuthed:()=>void }) {
               </button>
             </div>
             <PrivacyPolicy />
+          </div>
+        </div>
+      )}
+
+      {/* Terms and Conditions Modal */}
+      {showTerms && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/70" onClick={() => setShowTerms(false)} />
+          <div className="relative bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl max-w-4xl w-[95%] max-h-[85vh] overflow-y-auto p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-slate-100">Terms and Conditions</h3>
+              <button
+                onClick={() => setShowTerms(false)}
+                className="text-slate-400 hover:text-slate-200"
+                aria-label="Close terms and conditions"
+              >
+                ✕
+              </button>
+            </div>
+            <TermsAndConditions />
           </div>
         </div>
       )}

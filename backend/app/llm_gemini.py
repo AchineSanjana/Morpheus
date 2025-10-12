@@ -19,8 +19,7 @@ if api_key and genai:
 #   1) gemini-2.5-flash (preferred)
 #   2) gemini-2.0-flash
 #   3) gemini-2.0-flash-exp
-#   4) gemini-1.5-flash
-#   5) gemini-1.5-flash-8b
+
 # You can prepend additional models via GEMINI_FALLBACK_MODELS (comma-separated), which will be tried after the preferred model and before the defaults above.
 DEFAULT_PREFERRED_MODEL = os.getenv("GEMINI_PREFERRED_MODEL") or "gemini-2.5-flash"
 
@@ -37,8 +36,7 @@ def _fallback_model_list(preferred: str, env_val: Optional[str]) -> List[str]:
     defaults = [
         "gemini-2.0-flash",
         "gemini-2.0-flash-exp",
-        "gemini-1.5-flash",
-        "gemini-1.5-flash-8b",
+        
     ]
     if env_val:
         env_models = [m.strip() for m in env_val.split(",") if m.strip()]

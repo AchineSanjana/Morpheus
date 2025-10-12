@@ -5,6 +5,7 @@ import { SleepLogForm } from "./components/SleepLogForm";
 import { Chat } from "./components/Chat";
 import { Account } from "./components/Account";
 import PrivacyPolicy from "./components/PrivacyPolicy";
+import TermsAndConditions from "./components/TermsAndConditions";
 import morpheusLogo from "./assets/morpheus_logo.jpg";
 import "./index.css";
 import { useLayout } from "./lib/LayoutContext";
@@ -15,6 +16,7 @@ export default function App() {
   const [user, setUser] = useState<any>(null);
   const [showAccount, setShowAccount] = useState(false);
   const [showPrivacy, setShowPrivacy] = useState(false);
+  const [showTerms, setShowTerms] = useState(false);
 
   useEffect(()=>{
     // Subscribe to auth state changes for both clients (localStorage and sessionStorage clients)
@@ -128,9 +130,16 @@ export default function App() {
             <button
               type="button"
               onClick={() => setShowPrivacy(true)}
-              className="text-xs text-slate-400 hover:text-slate-200 underline"
+              className="text-xs text-slate-400 hover:text-slate-200 underline mr-4"
             >
               Privacy Policy
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowTerms(true)}
+              className="text-xs text-slate-400 hover:text-slate-200 underline"
+            >
+              Terms & Conditions
             </button>
           </div>
         </div>
@@ -160,6 +169,26 @@ export default function App() {
               </button>
             </div>
             <PrivacyPolicy />
+          </div>
+        </div>
+      )}
+
+      {/* Terms and Conditions Modal */}
+      {showTerms && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/70" onClick={() => setShowTerms(false)} />
+          <div className="relative bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl max-w-4xl w-[95%] max-h-[85vh] overflow-y-auto p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-slate-100">Terms and Conditions</h3>
+              <button
+                onClick={() => setShowTerms(false)}
+                className="text-slate-400 hover:text-slate-200"
+                aria-label="Close terms and conditions"
+              >
+                ✕
+              </button>
+            </div>
+            <TermsAndConditions />
           </div>
         </div>
       )}
