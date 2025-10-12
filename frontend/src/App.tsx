@@ -114,8 +114,8 @@ export default function App() {
         </div>
         
   {!fullWidthChat && <SleepLogForm />}
-        {/* Chat fills remaining vertical space on small screens only */}
-        <div className="flex-1 min-h-0 md:flex-none">
+        {/* Chat with fixed height for proper scrolling */}
+        <div>
           <Chat />
         </div>
         

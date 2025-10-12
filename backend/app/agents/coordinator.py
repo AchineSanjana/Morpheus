@@ -14,10 +14,11 @@ WELCOME_MENU = [
     "• Analyze my last 7 days",
     "• Give me a 7-day improvement plan",
     "• What do reputable sources say about caffeine/screens/bedtime?",
+    "• Get lifestyle guidance from my logs (caffeine/alcohol)",
     "• Tell me a bedtime story",
 ]
 
-_ALLOWED = {"analytics", "coach", "information", "storyteller", "addiction"}
+_ALLOWED = {"analytics", "coach", "information", "nutrition", "storyteller", "addiction"}
 
 class CoordinatorAgent(BaseAgent):
     name = "coordinator"
@@ -46,12 +47,18 @@ class CoordinatorAgent(BaseAgent):
         except Exception:
             pass
 
-        # Neutral info queries (topics like caffeine/alcohol/nicotine/screens)
-        if any(k in t for k in [
-            "caffeine", "coffee", "alcohol", "nicotine", "smoking", "screen", "screens",
-            "explain", "what is", "define", "tell me about", "effect of", "impact of"
-        ]):
-            return "information"
+        # Nutrition vs Information split
+        # If user shows personal context or asks for personalized/lifestyle help, send to nutrition
+        personal_cues = ["my ", "i ", "i'm", "i am", "based on my", "my logs", "last night", "last week", "should i", "what should i"]
+        lifestyle_terms = ["caffeine", "coffee", "alcohol", "diet", "food", "eating", "exercise", "workout", "screens", "screen"]
+        if any(term in t for term in lifestyle_terms):
+            if any(cue in t for cue in personal_cues):
+                return "nutrition"
+            # Neutral phrasing → information
+            if any(k in t for k in ["explain", "what is", "define", "tell me about", "effect of", "impact of", "how does"]):
+                return "information"
+            # Default lifestyle topic with no clear cue → nutrition for helpful personalization
+            return "nutrition"
 
         # Coaching
         if any(k in t for k in ["plan", "tips", "improve", "advice", "coach"]):
@@ -71,11 +78,12 @@ class CoordinatorAgent(BaseAgent):
             "Route the user's sleep message to exactly one agent:\n"
             "- analytics: analyze past data, trends, summaries, reports\n"
             "- coach: advice, plans, tips to improve sleep\n"
-            "- information: neutral facts/definitions about topics (caffeine, alcohol, nicotine, screens, etc.)\n"
+            "- information: neutral facts/definitions about topics (sleep science, caffeine/alcohol/screens in general)\n"
+            "- nutrition: personalized lifestyle guidance using the user's logs (caffeine timing, alcohol days, exercise); use only when the user seeks personal advice or refers to their logs or own habits\n"
             "- addiction: ONLY if message indicates dependency or quitting (e.g., 'addicted', 'can't stop', 'withdrawal', 'craving', 'too much', 'need to quit')\n"
             "- storyteller: short calming bedtime story\n\n"
             f"User message: \"{message}\"\n\n"
-            "Respond with just one word: analytics, coach, information, addiction, or storyteller."
+            "Respond with just one word: analytics, coach, information, nutrition, addiction, or storyteller."
         )
 
         try:
@@ -102,6 +110,10 @@ class CoordinatorAgent(BaseAgent):
         if choice == "addiction" and not self.addiction._detect_addiction_context(message):
             t = (message or "").lower()
             if any(k in t for k in ["caffeine", "coffee", "alcohol", "nicotine", "smoking", "screen", "screens"]):
+                # If personal cues present, nutrition; else information
+                personal_cues = ["my ", "i ", "i'm", "i am", "based on my", "my logs", "last night", "last week", "should i", "what should i"]
+                if any(cue in t for cue in personal_cues):
+                    return "nutrition"
                 return "information"
             return "coach"
 
@@ -144,6 +156,9 @@ class CoordinatorAgent(BaseAgent):
 
         if intent == "information":
             return await self.info.handle(message, ctx)
+
+        if intent == "nutrition":
+            return await self.nutrition.handle(message, ctx)
 
         if intent == "storyteller":
             return await self.story.handle(message, ctx)

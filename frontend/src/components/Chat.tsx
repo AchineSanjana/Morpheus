@@ -103,10 +103,22 @@ export function Chat() {
   const [conversations, setConversations] = useState<{ id: string; title: string; updated_at: string }[]>([]);
   const [showDrawer, setShowDrawer] = useState(false);
   const viewport = useRef<HTMLDivElement>(null);
+  const autoScrollRef = useRef<boolean>(true);
   
   useEffect(() => { 
-    viewport.current?.scrollTo({ top: 9e9, behavior: "smooth" }); 
+    const el = viewport.current;
+    if (!el) return;
+    if (autoScrollRef.current) {
+      el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+    }
   }, [msgs]);
+  
+  function handleScroll() {
+    const el = viewport.current;
+    if (!el) return;
+    const nearBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 40; // 40px threshold
+    autoScrollRef.current = nearBottom;
+  }
 
   const isAssistantTyping = loading && msgs[msgs.length - 1]?.role === "assistant" && !msgs[msgs.length - 1]?.content;
 
@@ -304,16 +316,16 @@ export function Chat() {
   }
 
   const bubbleBase = compactMode ? 'rounded-xl px-3 py-2 text-[13px] leading-[1.45]' : 'rounded-2xl px-4 py-3 text-sm leading-relaxed';
-  // Fill available space only on narrow screens; on md+ let content size naturally
-  const containerHeight = 'flex-1 min-h-0 md:flex-none';
+  // Use fixed height instead of flex-1 to enable proper scrolling
+  const containerHeight = 'h-[800px] min-h-[500px] max-h-[90vh]';
   const messageGap = compactMode ? 'space-y-3' : 'space-y-4';
 
   return (
     <div className="relative">
-  {/* Simplified background for performance (removed heavy blur filter). Flex to fill parent height. */}
+  {/* Simplified background for performance (removed heavy blur filter). Fixed height container. */}
   <div className={`relative flex flex-col md:flex-row ${containerHeight} bg-gradient-to-br from-slate-900/95 to-slate-800/95 border border-slate-700/50 rounded-2xl shadow-2xl shadow-black/20`}>
   {/* Sidebar: Conversations */}
-        <div id="chat-history-panel" className={`${sidebarCollapsed ? 'hidden' : 'hidden md:flex'} md:w-80 flex-col border-r border-slate-700/50 p-3 gap-2 overflow-y-auto hover-scrollbar`} aria-label="Conversations">
+  <div id="chat-history-panel" className={`${sidebarCollapsed ? 'hidden' : 'hidden md:flex'} md:w-80 flex-col border-r border-slate-700/50 p-3 gap-2 overflow-y-auto show-scrollbar min-h-0`} aria-label="Conversations">
           <div className="flex items-center justify-between mb-1">
             <div className="text-slate-300 text-sm font-semibold">Chat History</div>
             <div className="flex items-center gap-2">
@@ -413,7 +425,7 @@ export function Chat() {
           {showDrawer && (
             <div className="fixed inset-0 z-50 md:hidden">
               <div className="absolute inset-0 bg-black/60" onClick={() => setShowDrawer(false)}></div>
-              <div className="absolute left-0 top-0 bottom-0 w-4/5 max-w-sm bg-slate-900 border-r border-slate-700/50 p-4 overflow-y-auto">
+              <div className="absolute left-0 top-0 bottom-0 w-4/5 max-w-sm bg-slate-900 border-r border-slate-700/50 p-4 overflow-y-auto show-scrollbar">
                 <div className="flex items-center justify-between mb-3">
                   <div className="text-slate-200 font-semibold">Conversations</div>
                   <button className="text-slate-300" onClick={() => setShowDrawer(false)}>✕</button>
@@ -448,7 +460,7 @@ export function Chat() {
           )}
 
           {/* Messages */}
-          <div ref={viewport} className={`flex-1 min-h-0 overflow-y-auto ${compactMode ? 'p-3' : 'p-4'} ${messageGap} hover-scrollbar`}>
+          <div ref={viewport} onScroll={handleScroll} className={`flex-1 min-h-0 overflow-y-auto ${compactMode ? 'p-3' : 'p-4'} ${messageGap} show-scrollbar`}>
             {msgs.map((m, i) => (
               <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
                 <div className={`${sidebarCollapsed ? 'max-w-[min(98%,760px)]' : 'max-w-[min(96%,760px)]'} ${bubbleBase} ${
@@ -581,7 +593,8 @@ export function Chat() {
                 "Make me a sleep plan", 
                 "Why is Sleep important?",
                 "Tell me about caffeine",
-                "Tell me a story to help me relax"
+                "Tell me a story to help me relax",
+                "Should I stop caffeine"
               ].map((suggestion, i) => (
                 <button
                   key={i}

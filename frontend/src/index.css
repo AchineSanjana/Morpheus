@@ -193,3 +193,40 @@ body { background:#0a0a0a; color:#e5e5e5; margin:0; }
 .hover-scrollbar:hover::-webkit-scrollbar-track {
 	background-color: rgba(15,23,42,0.6); /* slate-900/60 */
 }
+
+/* Always-visible custom scrollbar variant */
+.show-scrollbar {
+  /* Use runtime-calculated scrollbar width if available, fallback to 8px */
+  --sbw: var(--scrollbar-w, 8px);
+  scrollbar-gutter: stable both-edges;
+  /* Firefox */
+  scrollbar-width: thin;
+  /* Enable momentum scrolling on iOS */
+  -webkit-overflow-scrolling: touch;
+  /* Ensure scrollable area is properly contained */
+  overscroll-behavior: contain;
+}
+.show-scrollbar::-webkit-scrollbar {
+  width: var(--sbw);
+  height: var(--sbw);
+}
+.show-scrollbar::-webkit-scrollbar-thumb {
+  background-color: rgba(100,116,139,0.6); /* slate-500/60 */
+  border-radius: 8px;
+  /* Make scrollbar more visible on mobile */
+  min-height: 20px;
+}
+.show-scrollbar::-webkit-scrollbar-track {
+  background-color: rgba(15,23,42,0.4); /* slate-900/40 */
+}
+/* Mobile-specific scrollbar enhancements */
+@media (max-width: 768px) {
+  .show-scrollbar {
+    /* Slightly wider scrollbar on mobile for easier touch interaction */
+    --sbw: 12px;
+  }
+  .show-scrollbar::-webkit-scrollbar-thumb {
+    background-color: rgba(100,116,139,0.8); /* More visible on mobile */
+    border-radius: 6px;
+  }
+}
