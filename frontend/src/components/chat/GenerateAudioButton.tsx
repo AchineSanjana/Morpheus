@@ -2,6 +2,11 @@ import { useState } from "react";
 import type { Msg } from "../../lib/types";
 import { supabase } from "../../lib/supabaseClient";
 
+/**
+ * GenerateAudioButton renders a round button that triggers audio generation
+ * for assistant messages from the Storyteller agent. It calls the backend
+ * API, then stores the returned audio file id on the message.
+ */
 export function GenerateAudioButton({
   message,
   messageIndex,
@@ -19,6 +24,10 @@ export function GenerateAudioButton({
   if (message.role !== "assistant" || !message.content || message.audioId || !isStoryteller)
     return null;
 
+  /**
+   * Calls the API to generate audio for the given message and updates the
+   * corresponding message with the returned audioId.
+   */
   const generateAudio = async () => {
     try {
       setIsGenerating(true);

@@ -61,10 +61,16 @@ except Exception as e:
 
 @app.get("/health")
 def health():
+    """Simple health check endpoint to verify the API is up."""
     return {"ok": True, "app": "Morpheus"}
 
 @app.post("/sleep-log")
 async def upsert_sleep_log(payload: SleepLogIn, authorization: str = Header(default="")):
+    """Insert or update the current user's sleep log entry.
+
+    Validates the bearer token, then persists the provided sleep log payload
+    for the authenticated user.
+    """
     user = await get_current_user(authorization.replace("Bearer ", ""))
     if not user:
         raise HTTPException(401, "Unauthorized")
@@ -75,11 +81,17 @@ async def upsert_sleep_log(payload: SleepLogIn, authorization: str = Header(defa
 
 @app.get("/profile/{user_id}")
 async def get_profile(user_id: str, authorization: str = Header(default="")):
+    """Fetch the user's profile, creating a fallback profile if missing.
+
+    Uses a DB trigger by default; if not present or on race conditions, a
+    minimal profile is created as a fallback.
+    """
     user = await get_current_user(authorization.replace("Bearer ", ""))
     if not user or user["id"] != user_id:
         raise HTTPException(401, "Unauthorized")
     
     def _fetch_or_create():
+        """Threadpool task: get profile or create a minimal fallback."""
         print(f"Attempting to fetch profile for user_id: {user_id}")
         try:
             # Try to fetch existing profile (should exist due to database trigger)
@@ -135,6 +147,7 @@ async def get_profile(user_id: str, authorization: str = Header(default="")):
 
 @app.put("/profile/{user_id}")
 async def update_profile(user_id: str, updates: dict, authorization: str = Header(default="")):
+    """Update whitelisted profile fields for the authenticated user."""
     user = await get_current_user(authorization.replace("Bearer ", ""))
     if not user or user["id"] != user_id:
         raise HTTPException(401, "Unauthorized")
@@ -147,6 +160,7 @@ async def update_profile(user_id: str, updates: dict, authorization: str = Heade
         raise HTTPException(400, "No valid fields to update")
     
     def _update():
+        """Threadpool task: apply partial profile updates (whitelisted)."""
         result = supabase.table("user_profile").update(filtered_updates).eq("id", user_id).execute()
         return result.data[0] if result.data else None
     
@@ -158,11 +172,13 @@ async def update_profile(user_id: str, updates: dict, authorization: str = Heade
 
 @app.post("/profile/{user_id}")
 async def create_profile(user_id: str, authorization: str = Header(default="")):
+    """Create a basic profile for the authenticated user if it doesn't exist."""
     user = await get_current_user(authorization.replace("Bearer ", ""))
     if not user or user["id"] != user_id:
         raise HTTPException(401, "Unauthorized")
     
     def _create():
+        """Threadpool task: create profile if missing; otherwise return existing."""
         # Check if profile already exists
         try:
             existing = supabase.table("user_profile").select("*").eq("id", user_id).single().execute()
@@ -194,11 +210,13 @@ async def create_profile(user_id: str, authorization: str = Header(default="")):
 
 @app.get("/debug/table-check")
 async def check_table(authorization: str = Header(default="")):
+    """Debug: check read access to user_profile table and return a sample."""
     user = await get_current_user(authorization.replace("Bearer ", ""))
     if not user:
         raise HTTPException(401, "Unauthorized")
     
     def _check():
+        """Threadpool task: attempt a minimal select on user_profile."""
         try:
             # Try to select from user_profile table
             result = supabase.table("user_profile").select("id").limit(1).execute()
@@ -259,6 +277,7 @@ async def upload_avatar(
     avatar: UploadFile = File(...),
     authorization: str = Header(default="")
 ):
+    """Upload a user's avatar image to storage and update their profile URL."""
     user = await get_current_user(authorization.replace("Bearer ", ""))
     if not user or user["id"] != user_id:
         raise HTTPException(401, "Unauthorized")
@@ -351,6 +370,7 @@ async def _coordinator_reply(message: str, user: dict, history: Optional[List[di
     return await coordinator.handle(message, ctx)
 
 def _generate_conversation_title(first_user_message: str) -> str:
+    """Generate a short, readable title from the first user message."""
     text = (first_user_message or "").strip()
     if not text:
         return "New conversation"
@@ -364,6 +384,12 @@ def _generate_conversation_title(first_user_message: str) -> str:
 
 @app.post("/chat/stream")
 async def chat_stream(request: Request, req: ChatRequest, authorization: str = Header(default="")):
+    """Stream a chat response from coordinator, creating or resuming a conversation.
+
+    Validates security, resolves the user and conversation, optionally creates a
+    conversation with a generated title, and streams coordinator output back to
+    the client.
+    """
     # Security validation
     await security_middleware.validate_request_security(request, req.message or "")
     

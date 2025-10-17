@@ -1,5 +1,15 @@
 // React import not required for JSX in React 17+
 
+/**
+ * Props for the MessageInput component.
+ * value: current input text
+ * onChange: updates input text
+ * onSend: submits the message
+ * loading: toggles disabled state and Stop button
+ * onStop: cancels an ongoing operation (optional)
+ * compactMode: uses condensed layout styles
+ * suggestions: quick-pick prompts to populate the input
+ */
 type Props = {
   value: string;
   onChange: (v: string) => void;
@@ -10,6 +20,12 @@ type Props = {
   suggestions?: string[];
 };
 
+/**
+ * MessageInput renders a chat text box with Send/Stop controls and suggestion chips.
+ * - Enter submits when Shift is not held; otherwise you can type normally.
+ * - The Send button is disabled for empty/whitespace input.
+ * - While loading, a Stop button appears to cancel the stream.
+ */
 export function MessageInput({ value, onChange, onSend, loading, onStop, compactMode, suggestions = [] }: Props) {
   return (
     <div className={`${compactMode ? 'p-3' : 'p-4'} border-t border-slate-700/50 bg-slate-900/50 pb-safe`}>
@@ -20,6 +36,7 @@ export function MessageInput({ value, onChange, onSend, loading, onStop, compact
             placeholder="Ask for analysis, plan, or explanation..."
             value={value}
             onChange={(e) => onChange(e.target.value)}
+            // Submit on Enter when Shift is not pressed; prevent newline insertion
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
@@ -30,6 +47,7 @@ export function MessageInput({ value, onChange, onSend, loading, onStop, compact
           />
           {value && (
             <button
+              // Clear the current input value
               onClick={() => onChange("")}
               className={`absolute ${compactMode ? 'right-2' : 'right-3'} top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 transition-colors`}
             >
@@ -39,6 +57,7 @@ export function MessageInput({ value, onChange, onSend, loading, onStop, compact
         </div>
         {loading ? (
           <button
+            // Request to stop ongoing processing/streaming
             onClick={() => onStop?.()}
             className={`bg-rose-600 hover:bg-rose-500 ${compactMode ? 'px-4 py-2 rounded-lg text-[13px]' : 'px-6 py-3 rounded-xl text-sm'} font-medium transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105 flex items-center gap-2`}
           >
@@ -47,6 +66,7 @@ export function MessageInput({ value, onChange, onSend, loading, onStop, compact
         ) : (
           <button
             disabled={!value.trim()}
+            // Send the current message
             onClick={onSend}
             className={`bg-gradient-to-r from-indigo-600 to-cyan-600 disabled:from-slate-600 disabled:to-slate-600 disabled:cursor-not-allowed hover:from-indigo-500 hover:to-cyan-500 ${compactMode ? 'px-4 py-2 rounded-lg text-[13px]' : 'px-6 py-3 rounded-xl text-sm'} font-medium transition-all duration-200 shadow-lg hover:shadow-xl disabled:shadow-none transform hover:scale-105 disabled:scale-100 flex items-center gap-2`}
           >
@@ -60,6 +80,7 @@ export function MessageInput({ value, onChange, onSend, loading, onStop, compact
         {suggestions.map((s, i) => (
           <button
             key={i}
+            // Replace input with the chosen suggestion
             onClick={() => onChange(s)}
             disabled={loading}
             className={`${compactMode ? 'text-[11px] px-2.5 py-1 rounded-md' : 'text-xs px-3 py-1 rounded-lg'} text-cyan-400 hover:text-cyan-300 bg-cyan-400/10 hover:bg-cyan-400/20 border border-cyan-400/20 transition-colors disabled:opacity-50`}

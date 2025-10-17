@@ -20,6 +20,7 @@ type Props = {
   disableEditing?: boolean;
 };
 
+/** Detects if the assistant message is the addiction selection menu. */
 function isAddictionMenu(content: string) {
   const lc = content.toLowerCase();
   return (
@@ -28,6 +29,7 @@ function isAddictionMenu(content: string) {
   );
 }
 
+/** Detects the initial welcome quick-actions menu. */
 function isWelcomeMenu(content: string) {
   const lc = content.toLowerCase();
   return (
@@ -37,6 +39,10 @@ function isWelcomeMenu(content: string) {
   );
 }
 
+/**
+ * Formats message content with very small markdown-like replacements.
+ * Supports bold, italic, bullets, and newlines -> <br/>
+ */
 function formatMessage(content: string) {
   const html = content
     .replace(/\*\*(.*?)\*\*/g, '<strong class="font-semibold text-cyan-300">$1</strong>')
@@ -138,6 +144,11 @@ function shouldSummarize(msg: Msg): boolean {
   return allowSummaryForAgent(msg) && isLongPlan(msg.content);
 }
 
+/**
+ * MessageList renders chat bubbles and related actions (edit last user message,
+ * quick action menus, audio generation). It also conditionally summarizes long
+ * assistant plans and lets users expand/collapse details.
+ */
 export function MessageList({
   msgs,
   isAssistantTyping,

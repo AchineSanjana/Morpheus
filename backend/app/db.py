@@ -47,6 +47,7 @@ def _iso(dt: datetime) -> str:
     return dt.replace(microsecond=0).isoformat()
 
 def _parse_dt(v: Any) -> Optional[datetime]:
+    """Parse a value into a datetime if possible; otherwise return None."""
     if isinstance(v, datetime):
         return v
     if isinstance(v, str):

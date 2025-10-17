@@ -2,10 +2,12 @@ from pydantic import BaseModel
 from typing import Optional, Any, Dict
 
 class ChatRequest(BaseModel):
+    """Request body for streaming chat endpoint."""
     message: str
     conversation_id: Optional[str] = None  # Optional conversation thread id
 
 class SleepLogIn(BaseModel):
+    """Sleep log entry input model for /sleep-log."""
     date: str
     bedtime: Optional[str] = None
     wake_time: Optional[str] = None
@@ -16,6 +18,7 @@ class SleepLogIn(BaseModel):
     notes: Optional[str] = None
 
 class PredictionRequest(BaseModel):
+    """Model for prediction-related prompts (if used by agents)."""
     message: str
     user_data: Optional[Dict[str, Any]] = None
  

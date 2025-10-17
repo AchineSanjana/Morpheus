@@ -30,6 +30,11 @@ export function Chat() {
   const [showDrawer, setShowDrawer] = useState(false);
   const viewport = useRef<HTMLDivElement>(null);
   const autoScrollRef = useRef<boolean>(true);
+  // Streaming performance buffers
+  const textBufferRef = useRef<string>("");
+  const metaBufferRef = useRef<{ rai?: any; data?: any } | null>(null);
+  const flushScheduledRef = useRef<boolean>(false);
+  const flushTimerRef = useRef<number | null>(null);
   
   useEffect(() => { 
     const el = viewport.current;
@@ -60,6 +65,7 @@ export function Chat() {
     return `${days}d ago`;
   }
 
+  /** Fetch and populate the conversation list for the sidebar/history. */
   async function refreshConversations() {
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -75,6 +81,7 @@ export function Chat() {
   useEffect(() => { refreshConversations(); }, []);
 
   // Welcome message factory
+  /** Initial assistant greeting for a new/cleared conversation. */
   function getWelcome(): Msg[] {
     return [
       { 
@@ -108,6 +115,7 @@ export function Chat() {
     else localStorage.removeItem('activeConversationTitle');
   }, [conversationTitle]);
 
+  /** Load messages for a specific conversation id (with one-time recovery fallback). */
   async function loadConversation(id: string) {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) return;
@@ -157,6 +165,11 @@ export function Chat() {
     }
   }
 
+  /**
+   * Core streaming send: appends user + placeholder assistant message,
+   * streams chunks into buffers, periodically flushes to state, and
+   * captures conversation metadata as it arrives.
+   */
   async function sendInternal(text: string) {
     if (!text.trim() || loading) return;
     setStatus({type:"idle"});
@@ -175,29 +188,68 @@ export function Chat() {
   // Ensure any previous stream is stopped
   try { abortRef.current?.abort(); } catch {}
   abortRef.current = new AbortController();
+  // Reset buffers for this new stream
+  textBufferRef.current = "";
+  metaBufferRef.current = null;
+  flushScheduledRef.current = false;
+  if (flushTimerRef.current) { clearTimeout(flushTimerRef.current); flushTimerRef.current = null; }
     setStatus({type:"typing", msg:"AI is thinking..."});
+
+    // Flush buffered text/metadata into the last assistant message
+    const flushBufferedUpdate = () => {
+      if (!textBufferRef.current && !metaBufferRef.current) { flushScheduledRef.current = false; return; }
+      const pendingText = textBufferRef.current;
+      const pendingMeta = metaBufferRef.current;
+      textBufferRef.current = "";
+      metaBufferRef.current = null;
+      flushScheduledRef.current = false;
+      setMsgs(m => {
+        const copy = [...m];
+        const prev = copy[copy.length - 1];
+        const updated: Msg = {
+          ...prev,
+          role: "assistant",
+          content: (prev?.content || "") + pendingText,
+          ...(pendingMeta?.rai ? {
+            responsibleAIChecks: pendingMeta.rai.responsibleAIChecks ?? prev.responsibleAIChecks,
+            responsibleAIPassed: pendingMeta.rai.responsibleAIPassed ?? prev.responsibleAIPassed,
+            responsibleAIRiskLevel: pendingMeta.rai.responsibleAIRiskLevel ?? prev.responsibleAIRiskLevel,
+          } : {}),
+          ...(pendingMeta?.data ? {
+            data: { ...(prev.data || {}), ...pendingMeta.data }
+          } : { data: prev.data })
+        };
+        copy[copy.length - 1] = updated;
+        return copy;
+      });
+    };
+
+    // Request a near-frame-rate flush of buffered updates for smooth UI
+    const scheduleFlush = () => {
+      if (flushScheduledRef.current) return;
+      flushScheduledRef.current = true;
+      if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
+        window.requestAnimationFrame(() => flushBufferedUpdate());
+      } else {
+        // Fallback: flush within ~33ms
+        flushTimerRef.current = window.setTimeout(() => flushBufferedUpdate(), 33);
+      }
+    };
 
     try {
       await streamChat(text, session.access_token, (chunk, responsibleAIData, data) => {
-        setMsgs(m => {
-          const copy = [...m];
-          const prev = copy[copy.length - 1];
-          const updated: Msg = {
-            ...prev,
-            role: "assistant",
-            content: (prev?.content || "") + chunk,
-            responsibleAIChecks: responsibleAIData?.responsibleAIChecks ?? prev.responsibleAIChecks,
-            responsibleAIPassed: responsibleAIData?.responsibleAIPassed ?? prev.responsibleAIPassed,
-            responsibleAIRiskLevel: responsibleAIData?.responsibleAIRiskLevel ?? prev.responsibleAIRiskLevel,
-            data: (responsibleAIData || data) ? {
-              ...(prev.data || {}),
-              ...(data || {}),
-              ...(responsibleAIData ? { responsibleAI: responsibleAIData } : {}),
-            } : prev.data
-          };
-          copy[copy.length - 1] = updated;
-          return copy;
-        });
+        // Buffer text
+        if (chunk) {
+          textBufferRef.current += chunk;
+        }
+        // Buffer metadata to apply on next flush
+        if (responsibleAIData || data) {
+          metaBufferRef.current = {
+            rai: responsibleAIData ? { ...responsibleAIData } : metaBufferRef.current?.rai,
+            data: data ? { ...(metaBufferRef.current?.data || {}), ...data } : metaBufferRef.current?.data
+          } as any;
+        }
+        scheduleFlush();
         // Capture conversation_id and title from first metadata
         if (data?.conversation_id && !conversationId) {
           setConversationId(data.conversation_id);
@@ -206,12 +258,15 @@ export function Chat() {
           setConversationTitle(data.conversation_title);
         }
       }, conversationId, abortRef.current.signal);
+      // Final flush in case buffer has remaining text
+      flushBufferedUpdate();
       // Refresh list after message stored
       refreshConversations();
       setStatus({type:"idle"});
     } catch (e: any) {
       if (e?.name === 'AbortError') {
         // User stopped the stream: keep partial message, clear typing state
+        flushBufferedUpdate();
         setStatus({ type: 'idle' });
       } else {
         setStatus({type:"error", msg: e.message || "Something went wrong"});
@@ -223,17 +278,20 @@ export function Chat() {
   }
 
   // Editing handlers
+  /** Begin editing the last user message. */
   function handleEditStart(index: number, initial: string) {
     if (loading) return; // avoid editing while streaming to keep state simple
     setEditingIndex(index);
     setEditText(initial);
   }
 
+  /** Cancel editing and reset edit state. */
   function handleEditCancel() {
     setEditingIndex(null);
     setEditText("");
   }
 
+  /** Save edited user message, drop any following assistant reply, and resend. */
   async function handleEditSave(index: number) {
     const newText = editText.trim();
     if (!newText) { handleEditCancel(); return; }
@@ -257,6 +315,7 @@ export function Chat() {
     await sendInternal(newText);
   }
 
+  /** Abort the current streaming request and reset typing state. */
   function stopStreaming() {
     try { abortRef.current?.abort(); } catch {}
     abortRef.current = null;
@@ -264,6 +323,7 @@ export function Chat() {
     setLoading(false);
   }
 
+  /** Submit the current input box text and clear the input. */
   async function sendInput() {
     const text = input.trim();
     if (!text) return;
@@ -271,6 +331,7 @@ export function Chat() {
     await sendInternal(text);
   }
 
+  /** Send one of the quick-action suggestions. */
   async function sendQuick(text: string) {
     await sendInternal(text);
   }

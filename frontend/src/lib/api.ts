@@ -1,6 +1,10 @@
 const API_URL = import.meta.env.VITE_API_URL;
 
 // Stream chat messages from the server
+/**
+ * Stream chunks of an assistant response for a given message.
+ * Calls onChunk as text and metadata arrive; supports AbortController.
+ */
 export async function streamChat(
   message: string,
   token: string,
@@ -100,6 +104,7 @@ export type SleepLogPayload = {
   notes: string | null;
 };
 
+/** Save/append a sleep log entry for the authenticated user. */
 export async function saveSleepLog(payload: SleepLogPayload, token: string) {
   const api = import.meta.env.VITE_API_URL as string;
   const res = await fetch(`${api}/sleep-log`, {
@@ -119,6 +124,7 @@ export type SleepLog = SleepLogPayload & {
   duration_h?: number | null; // computed server-side when possible
 };
 
+/** Fetch recent sleep logs (default 7 days). */
 export async function fetchRecentSleepLogs(token: string, days = 7): Promise<SleepLog[]> {
   const api = import.meta.env.VITE_API_URL as string;
   const res = await fetch(`${api}/sleep-logs?days=${days}`, {
@@ -139,6 +145,7 @@ type Message = {
   // add other fields as needed
 };
 
+/** Fetch historical chat messages with optional pagination. */
 export async function fetchMessages(token: string, opts?: { limit?: number; before?: string; after?: string }) {
   const api = import.meta.env.VITE_API_URL as string;
   const params = new URLSearchParams();
@@ -158,6 +165,7 @@ export async function fetchMessages(token: string, opts?: { limit?: number; befo
 // Conversations API
 export type Conversation = { id: string; title: string; created_at: string; updated_at: string };
 
+/** List recent conversations for the authenticated user. */
 export async function listConversations(token: string): Promise<Conversation[]> {
   const api = import.meta.env.VITE_API_URL as string;
   const res = await fetch(`${api}/conversations`, {
@@ -171,6 +179,7 @@ export async function listConversations(token: string): Promise<Conversation[]> 
   return (data?.conversations ?? []) as Conversation[];
 }
 
+/** Get all messages for a conversation (role, agent, content). */
 export async function getConversationMessages(token: string, conversationId: string) {
   const api = import.meta.env.VITE_API_URL as string;
   const res = await fetch(`${api}/conversations/${conversationId}`, {
@@ -183,6 +192,7 @@ export async function getConversationMessages(token: string, conversationId: str
   return res.json() as Promise<{ messages: { role: 'user'|'assistant'; agent: string; content: string; created_at: string }[] }>; 
 }
 
+/** Rename a conversation title. */
 export async function renameConversation(token: string, conversationId: string, title: string) {
   const api = import.meta.env.VITE_API_URL as string;
   const res = await fetch(`${api}/conversations/${conversationId}`, {
@@ -197,6 +207,7 @@ export async function renameConversation(token: string, conversationId: string, 
   return res.json();
 }
 
+/** Delete a conversation by id. */
 export async function deleteConversation(token: string, id: string) {
   const res = await fetch(`${API_URL}/conversations/${id}`, {
     method: 'DELETE',
@@ -209,6 +220,7 @@ export async function deleteConversation(token: string, id: string) {
   return await res.json();
 }
 
+/** Attempt to recover missing conversations (server-side operation). */
 export async function recoverConversations(token: string) {
   const res = await fetch(`${API_URL}/conversations/recover`, {
     method: 'POST',
@@ -231,6 +243,7 @@ export type ProfileData = {
   updated_at: string;
 };
 
+/** Fetch a user's profile or return null if not found. */
 export async function fetchProfile(userId: string, token: string): Promise<ProfileData | null> {
   try {
     const api = import.meta.env.VITE_API_URL as string;
@@ -249,6 +262,7 @@ export async function fetchProfile(userId: string, token: string): Promise<Profi
   }
 }
 
+/** Update profile fields for the authenticated user. */
 export async function updateProfile(userId: string, updates: Partial<ProfileData>, token: string): Promise<ProfileData> {
   const api = import.meta.env.VITE_API_URL as string;
   const res = await fetch(`${api}/profile/${userId}`, {
@@ -268,6 +282,7 @@ export async function updateProfile(userId: string, updates: Partial<ProfileData
   return await res.json() as ProfileData;
 }
 
+/** Upload an avatar image and return its public URL. */
 export async function uploadAvatar(file: File, userId: string, token: string): Promise<string> {
   // Validate file on client side
   if (!file.type.startsWith('image/')) {

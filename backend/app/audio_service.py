@@ -105,7 +105,7 @@ class AudioService:
                 self.tts_engine = None
     
     def _configure_voice(self):
-        """Configure the TTS voice for gentle bedtime stories"""
+        """Configure the TTS voice for gentle bedtime stories."""
         if not self.tts_engine:
             return
             
@@ -158,7 +158,7 @@ class AudioService:
             logger.warning(f"Failed to configure TTS voice: {e}")
     
     def _preprocess_text_for_gentle_speech(self, text: str) -> str:
-        """Preprocess text to make speech more gentle and natural"""
+        """Preprocess text to make speech more gentle and natural."""
         if not text:
             return text
         
@@ -198,7 +198,7 @@ class AudioService:
         return processed_text
     
     def _apply_gentle_audio_effects(self, audio_file_path: str) -> str:
-        """Apply gentle audio effects to make the audio more soothing"""
+        """Apply gentle audio effects (normalize, soften, fades) for bedtime listening."""
         if not AUDIO_PROCESSING_AVAILABLE:
             logger.info("Audio processing not available, returning original file")
             return audio_file_path
@@ -248,7 +248,7 @@ class AudioService:
             return audio_file_path  # Return original file if processing fails
     
     def _get_cache_key(self, text: str, settings: Dict[str, Any]) -> str:
-        """Generate cache key for audio file"""
+        """Generate a stable cache key for the audio content and settings."""
         provider = settings.get("provider") or ("edge-tts" if EDGE_TTS_AVAILABLE else ("pyttsx3" if PYTTSX3_AVAILABLE else ("gtts" if GTTS_AVAILABLE else "none")))
         voice_key = settings.get('edge_tts_voice') if provider == 'edge-tts' else (
             settings.get('elevenlabs_voice_id') if provider == 'elevenlabs' else settings.get('selected_voice_id', '')
@@ -262,7 +262,7 @@ class AudioService:
         output_format: str = "mp3",
         use_cache: bool = True
     ) -> Optional[str]:
-        """Convert text to speech and return file path"""
+        """Convert text to speech and return file path (cached when possible)."""
         
         if not TTS_AVAILABLE:
             logger.error("TTS libraries not available")
@@ -288,7 +288,7 @@ class AudioService:
             return None
     
     async def _generate_audio_file(self, text: str, output_path: Path, format: str) -> Optional[str]:
-        """Generate audio file using selected/available TTS engine"""
+        """Generate audio file using the selected/available TTS engine with fallbacks."""
         provider = self.settings.get("provider")
         # For neural-like providers, keep original text to avoid over-pausing
         processed_text = text if provider in ("edge-tts", "elevenlabs") else self._preprocess_text_for_gentle_speech(text)
@@ -322,7 +322,7 @@ class AudioService:
             return None
     
     async def _generate_with_pyttsx3(self, text: str, output_path: Path) -> str:
-        """Generate audio using pyttsx3 (offline) with gentle post-processing"""
+        """Generate audio using pyttsx3 (offline) with gentle post-processing."""
         
         def _generate():
             temp_file = str(output_path.with_suffix('.wav'))
@@ -354,7 +354,7 @@ class AudioService:
         return audio_file
 
     async def _generate_with_elevenlabs(self, text: str, output_path: Path, format: str) -> str:
-        """Generate audio using ElevenLabs neural TTS for more human-like narration"""
+        """Generate audio using ElevenLabs neural TTS for human-like narration."""
         api_key = self.settings.get("elevenlabs_api_key")
         voice_id = self.settings.get("elevenlabs_voice_id")
         model = self.settings.get("elevenlabs_model")
