@@ -1,11 +1,13 @@
 # 🏗️ Morpheus Sleep AI – System Architecture Overview
 
 Version: 1.0
-Last Updated: September 27, 2025
+Last Updated: October 17, 2025
 Owner: Engineering
 Classification: Internal
 
 ---
+
+Note: This is the canonical high-level architecture overview for Morpheus. For a deeper, implementation-focused view (tiers, scaling, and sample flows), see `SYSTEM_ARCHITECTURE.md`.
 
 ## 📋 Table of Contents
 

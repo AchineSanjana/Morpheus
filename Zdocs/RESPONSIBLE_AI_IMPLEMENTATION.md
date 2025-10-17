@@ -1,5 +1,9 @@
 # Responsible AI Implementation - Morpheus Sleep AI Assistant
 
+Last Updated: October 17, 2025
+
+Related: See `ARCHITECTURE_OVERVIEW.md` (system context) and `SECURITY_DOCUMENTATION.md` (privacy/safety controls). The frontend includes a Privacy Policy modal (`PrivacyPolicy.tsx`) that surfaces Responsible AI disclosures.
+
 ## Overview
 
 This document outlines the comprehensive responsible AI implementation in the Morpheus Sleep AI Assistant, ensuring fairness, transparency, and ethical handling of data across all AI interactions.

@@ -1,6 +1,6 @@
 # 🔒 Morpheus Security Quick Reference Guide
 
-**For Developers & Operators** | **Version 2.0** | **Updated: Sep 26, 2025**
+**For Developers & Operators** | **Version 2.0** | **Updated: Oct 17, 2025**
 
 ---
 

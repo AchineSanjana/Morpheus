@@ -1,5 +1,9 @@
 # Morpheus Sleep AI Assistant - Agent Roles & Communication Flow
 
+Last Updated: October 17, 2025
+
+Agents present in codebase: coordinator, coach, analyst, information, nutrition, addiction, storyteller, prediction. See `ARCHITECTURE_OVERVIEW.md` for system context.
+
 ## Overview
 
 The Morpheus Sleep AI Assistant employs a sophisticated multi-agent architecture where specialized agents collaborate to provide comprehensive sleep coaching. This document defines the roles of each agent, their communication protocols, and the flow of information throughout the system.

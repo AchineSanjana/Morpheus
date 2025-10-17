@@ -1,5 +1,9 @@
 # Morpheus Sleep AI Assistant - System Architecture
 
+Last Updated: October 17, 2025
+
+Note: This document complements `ARCHITECTURE_OVERVIEW.md` with deeper tier-by-tier details, diagrams, and example snippets. Treat `ARCHITECTURE_OVERVIEW.md` as the canonical starting point.
+
 ## Overview
 
 The Morpheus Sleep AI Assistant is a comprehensive, scalable platform designed to provide personalized sleep coaching while maintaining the highest standards of responsible AI. This document outlines the system architecture, component interactions, scalability considerations, and responsible AI integration.

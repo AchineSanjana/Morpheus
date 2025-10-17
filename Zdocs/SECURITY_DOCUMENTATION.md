@@ -1,7 +1,7 @@
 # 🔒 Morpheus Sleep AI - Security Documentation
 
 **Version**: 2.0  
-**Last Updated**: September 27, 2025  
+**Last Updated**: October 17, 2025  
 **Classification**: Internal  
 **Document Owner**: Security Team  
 
@@ -41,6 +41,7 @@ Morpheus Sleep AI is a secure, AI-powered bedtime storytelling application desig
 - ✅ Real-time threat detection
  - ✅ In-app Privacy Policy UI with clear disclosures
  - ✅ Auth session stored via localStorage or sessionStorage based on user consent (Remember me)
+ - ℹ️ See `SECURITY_QUICK_REFERENCE.md` for quick commands and checklists.
 
 ---
 

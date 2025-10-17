@@ -1,18 +1,23 @@
-# 🔒 Morpheus Sleep AI - Security Implementation Guide
+# 🔒 Morpheus Security – Index & Quick Links
 
-Status note (Sep 27, 2025): Frontend now includes an in-app Privacy Policy modal (`PrivacyPolicy.tsx`), and authentication supports both persistent (localStorage) and session-only (sessionStorage) tokens via dual Supabase clients. Ensure your CSP and cookie/storage policies reflect this behavior.
+Last Updated: October 17, 2025
 
-## ✅ **Security Features Implemented**
+This file serves as the index for Morpheus security documentation. For full details, use the canonical docs below:
 
-### **1. Input Security & Sanitization**
-- ✅ **Prompt Injection Protection**: Filters dangerous patterns like "ignore previous instructions"
-- ✅ **XSS Prevention**: Removes script tags and JavaScript injections
-- ✅ **SQL Injection Protection**: Sanitizes database-related patterns
-- ✅ **Input Length Limiting**: Prevents buffer overflow attacks
-- ✅ **Special Character Filtering**: Removes potentially harmful characters
+- Comprehensive reference: `SECURITY_DOCUMENTATION.md`
+- Quick checklist and commands: `SECURITY_QUICK_REFERENCE.md`
 
-### **2. Output Validation & Content Safety**
-- ✅ **Harmful Content Detection**: Blocks violence, explicit content, scary material
+Status note: The frontend includes an in-app Privacy Policy modal (`PrivacyPolicy.tsx`). Authentication supports persistent (localStorage) and session-only (sessionStorage) tokens via dual Supabase clients—ensure CSP and storage policies reflect this behavior.
+
+## ✅ Key Security Areas at a Glance
+
+- Input security and sanitization (injection/XSS/SQLi protection)
+- Output validation and content safety (harmful content and PII protection)
+- Rate limiting and DoS protections (per-IP and endpoint-specific)
+- Security headers and HTTPS (CSP, HSTS, X-Frame-Options, etc.)
+- Security monitoring and audit logging
+
+For implementation details, configuration, and testing steps, see the two canonical docs linked above.
 - ✅ **PII Protection**: Prevents personal information leakage
 - ✅ **Medical Advice Filtering**: Blocks inappropriate medical content
 - ✅ **Content Length Validation**: Ensures proper story length
@@ -226,5 +231,4 @@ AI_MODEL_TEMPERATURE_LIMIT=1.0        # Maximum creativity level
 
 ---
 
-*Last Updated: December 2024*
-*Security Implementation Version: 2.0*
+*Security Docs Canonicalized: October 17, 2025*
