@@ -1,102 +1,28 @@
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { streamChat, listConversations, getConversationMessages, renameConversation, deleteConversation, recoverConversations } from "../lib/api";
-import { AudioPlayer } from "./AudioPlayer";
 import { useLayout } from "../lib/LayoutContext";
+import { MessageList } from "./chat/MessageList";
+import { MessageInput } from "./chat/MessageInput";
+import type { Msg } from "../lib/types";
 
-type Msg = { 
-  role: "user" | "assistant"; 
-  content: string; 
-  responsibleAIChecks?: Record<string, any>;
-  responsibleAIPassed?: boolean;
-  responsibleAIRiskLevel?: string;
-  data?: Record<string, any>;
-  audioId?: string;  // For generated audio
-};
+// Msg type moved to lib/types
 
-// Component for the Generate Audio button
-function GenerateAudioButton({ message, messageIndex, setMsgs }: {
-  message: Msg;
-  messageIndex: number;
-  setMsgs: React.Dispatch<React.SetStateAction<Msg[]>>;
-}) {
-  const [isGenerating, setIsGenerating] = useState(false);
-
-  // Only show for assistant storyteller messages without audio yet
-  const isStoryteller = typeof message?.data?.agent === 'string' && message.data.agent.toLowerCase() === 'storyteller';
-  if (message.role !== 'assistant' || !message.content || message.audioId || !isStoryteller) return null;
-
-  const generateAudio = async () => {
-    try {
-      setIsGenerating(true);
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        throw new Error('Please sign in to generate audio');
-      }
-
-      const api = import.meta.env.VITE_API_URL as string;
-      const response = await fetch(`${api}/audio/generate`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`
-        },
-        body: JSON.stringify({ text: message.content })
-      });
-
-      if (!response.ok) {
-        const text = await response.text().catch(() => '');
-        throw new Error(text || 'Failed to generate audio');
-      }
-
-      const audioData = await response.json();
-
-      // Update the message with audio ID
-      setMsgs((prev) => {
-        const updatedMsgs = [...prev];
-        updatedMsgs[messageIndex] = {
-          ...updatedMsgs[messageIndex],
-          audioId: audioData.audio_id,
-        };
-        return updatedMsgs;
-      });
-    } catch (error: any) {
-      console.error('Audio generation error:', error);
-      alert(error?.message || 'Failed to generate audio');
-    } finally {
-      setIsGenerating(false);
-    }
-  };
-
-  return (
-    <div className="mt-2 flex justify-end">
-      <button
-        onClick={generateAudio}
-        disabled={isGenerating}
-        aria-label={isGenerating ? 'Generating audio...' : 'Generate audio'}
-        title={isGenerating ? 'Generating audio...' : 'Generate audio'}
-        className="w-10 h-10 rounded-full bg-gradient-to-r from-indigo-600 to-cyan-600 hover:from-indigo-500 hover:to-cyan-500 disabled:from-slate-600 disabled:to-slate-600 text-white flex items-center justify-center shadow-lg shadow-black/20 ring-1 ring-slate-700/60 transition-colors disabled:cursor-not-allowed"
-      >
-        {isGenerating ? (
-          <div className="w-4 h-4 border-2 border-white/30 border-t-transparent rounded-full animate-spin" />
-        ) : (
-          <span className="text-lg">🔊</span>
-        )}
-      </button>
-    </div>
-  );
-}
+// GenerateAudioButton moved to components/chat/GenerateAudioButton and used inside MessageList
 
 export function Chat() {
   const { compactMode, sidebarCollapsed, toggleCompactMode, toggleSidebarCollapsed } = useLayout();
   const [msgs, setMsgs] = useState<Msg[]>([
     { 
       role: "assistant", 
-      content: "Hi! I'm your sleep coordinator. 🌙\n\nLog last night below, or ask me to:\n• **Analyze my last 7 days**\n• **Make me a sleep plan**\n• **Tell me about caffeine and sleep**"
+      content: "Hi! I'm your sleep coordinator. 🌙\n\nHere are some things you can try:"
     }
   ]);
   const [input, setInput] = useState(""); 
   const [loading, setLoading] = useState(false);
+  const abortRef = useRef<AbortController | null>(null);
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [editText, setEditText] = useState<string>("");
   const [status, setStatus] = useState<{type:"idle"|"typing"|"error";msg?:string}>({type:"idle"});
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [conversationTitle, setConversationTitle] = useState<string | null>(null);
@@ -153,7 +79,7 @@ export function Chat() {
     return [
       { 
         role: "assistant", 
-        content: "Hi! I'm your sleep coordinator. 🌙\n\nLog last night below, or ask me to:\n• **Analyze my last 7 days**\n• **Make me a sleep plan**\n• **Tell me about caffeine and sleep**"
+        content: "Hi! I'm your sleep coordinator Morpheus. 🌙\n\nHere are some things you can try:"
       }
     ];
   }
@@ -245,7 +171,10 @@ export function Chat() {
       return;
     }
 
-    setLoading(true);
+  setLoading(true);
+  // Ensure any previous stream is stopped
+  try { abortRef.current?.abort(); } catch {}
+  abortRef.current = new AbortController();
     setStatus({type:"typing", msg:"AI is thinking..."});
 
     try {
@@ -276,15 +205,62 @@ export function Chat() {
         if (data?.conversation_title && !conversationTitle) {
           setConversationTitle(data.conversation_title);
         }
-      }, conversationId);
+      }, conversationId, abortRef.current.signal);
       // Refresh list after message stored
       refreshConversations();
       setStatus({type:"idle"});
     } catch (e: any) {
-      setStatus({type:"error", msg: e.message || "Something went wrong"});
-      // Remove the empty assistant message on error
-      setMsgs(m => m.slice(0, -1));
+      if (e?.name === 'AbortError') {
+        // User stopped the stream: keep partial message, clear typing state
+        setStatus({ type: 'idle' });
+      } else {
+        setStatus({type:"error", msg: e.message || "Something went wrong"});
+        // Remove the empty assistant message on error
+        setMsgs(m => m.slice(0, -1));
+      }
     }
+    setLoading(false);
+  }
+
+  // Editing handlers
+  function handleEditStart(index: number, initial: string) {
+    if (loading) return; // avoid editing while streaming to keep state simple
+    setEditingIndex(index);
+    setEditText(initial);
+  }
+
+  function handleEditCancel() {
+    setEditingIndex(null);
+    setEditText("");
+  }
+
+  async function handleEditSave(index: number) {
+    const newText = editText.trim();
+    if (!newText) { handleEditCancel(); return; }
+
+    // Stop any in-flight stream
+    stopStreaming();
+
+    // Replace the edited user message and remove any assistant message that follows it
+    setMsgs(prev => {
+      const copy = [...prev];
+      copy[index] = { ...copy[index], content: newText };
+      // If next message is assistant (response to old text), remove it to avoid mismatch
+      if (copy[index + 1]?.role === 'assistant') {
+        copy.splice(index + 1, 1);
+      }
+      return copy;
+    });
+
+    setEditingIndex(null);
+    setEditText("");
+    await sendInternal(newText);
+  }
+
+  function stopStreaming() {
+    try { abortRef.current?.abort(); } catch {}
+    abortRef.current = null;
+    setStatus({ type: 'idle' });
     setLoading(false);
   }
 
@@ -299,29 +275,6 @@ export function Chat() {
     await sendInternal(text);
   }
 
-  function formatMessage(content: string) {
-    // Markdown-like formatting and explicit <br/> for newlines
-    const html = content
-      .replace(/\*\*(.*?)\*\*/g, '<strong class="font-semibold text-cyan-300">$1</strong>')
-      .replace(/\*(.*?)\*/g, '<em class="italic text-slate-300">$1</em>')
-      .replace(/•/g, '<span class="text-cyan-400">•</span>')
-      .replace(/\n/g, '<br/>');
-    return <div dangerouslySetInnerHTML={{ __html: html }} className="leading-relaxed whitespace-pre-wrap" />;
-  }
-
-  // Detect if a message is the generic addiction support menu
-  function isAddictionMenu(content: string) {
-    const lc = content.toLowerCase();
-    return lc.includes("i'm here to help with addiction concerns") || lc.includes("what would you like support with today?");
-  }
-
-  // Detect if a message is the coordinator welcome menu
-  function isWelcomeMenu(content: string) {
-    const lc = content.toLowerCase();
-    return lc.includes("sleep coordinator") && (lc.includes("here are some things you can try") || lc.includes("predict tonight's sleep"));
-  }
-
-  const bubbleBase = compactMode ? 'rounded-xl px-3 py-2 text-[13px] leading-[1.45]' : 'rounded-2xl px-4 py-3 text-sm leading-relaxed';
   // Use fixed height instead of flex-1 to enable proper scrolling
   const containerHeight = 'h-[800px] min-h-[500px] max-h-[90vh]';
   const messageGap = compactMode ? 'space-y-3' : 'space-y-4';
@@ -423,6 +376,7 @@ export function Chat() {
                   <div className="w-2 h-2 bg-cyan-400 rounded-full animate-bounce"></div>
                 </div>
                 <span>Thinking...</span>
+                <button className="ml-2 text-rose-300 hover:text-white border border-rose-400/30 rounded px-2 py-0.5" onClick={stopStreaming}>Stop</button>
               </div>
             )}
           </div>
@@ -467,108 +421,21 @@ export function Chat() {
 
           {/* Messages */}
           <div ref={viewport} onScroll={handleScroll} className={`flex-1 min-h-0 overflow-y-auto ${compactMode ? 'p-3' : 'p-4'} ${messageGap} show-scrollbar`}>
-            {msgs.map((m, i) => (
-              <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
-                <div className={`${sidebarCollapsed ? 'max-w-[min(98%,760px)]' : 'max-w-[min(96%,760px)]'} ${bubbleBase} ${
-                  m.role === "user" 
-                    ? "bg-gradient-to-r from-indigo-600 to-cyan-600 text-white shadow-lg" 
-                    : "bg-slate-800/80 border border-slate-700/50 text-slate-100 shadow-md"
-                }`}>
-                  {m.role === "assistant" ? (
-                    <div className={compactMode ? 'space-y-2' : 'space-y-3'}>
-                      {/* Text content */}
-                      <div className={compactMode ? 'text-[13px] leading-[1.55]' : 'text-sm leading-relaxed'}>
-                        {m.content ? formatMessage(m.content) : (
-                          isAssistantTyping ? (
-                            <div className="flex items-center gap-2 text-slate-400">
-                              <div className="flex gap-1">
-                                <div className="w-2 h-2 bg-slate-400 rounded-full animate-pulse"></div>
-                                <div className="w-2 h-2 bg-slate-400 rounded-full animate-pulse [animation-delay:0.2s]"></div>
-                                <div className="w-2 h-2 bg-slate-400 rounded-full animate-pulse [animation-delay:0.4s]"></div>
-                              </div>
-                            </div>
-                          ) : (
-                            <span className="text-slate-500">...</span>
-                          )
-                        )}
-                      </div>
-
-                      {/* Quick-select buttons for Addiction menu */}
-                      {m.content && isAddictionMenu(m.content) && (
-                        <div className="flex flex-wrap gap-2 pt-1">
-                          {[
-                            { label: "☕ Caffeine", value: "I'm addicted to caffeine" },
-                            { label: "🍷 Alcohol", value: "I'm addicted to alcohol" },
-                            { label: "🚬 Nicotine", value: "I'm addicted to nicotine/tobacco" },
-                            { label: "📱 Digital/Screen", value: "I'm addicted to digital/screen time" }
-                          ].map((opt, idx) => (
-                            <button
-                              key={idx}
-                              onClick={() => sendQuick(opt.value)}
-                              disabled={loading}
-                              className="text-xs text-indigo-300 hover:text-white bg-indigo-500/10 hover:bg-indigo-500/20 px-3 py-1.5 rounded-lg border border-indigo-400/20 transition-colors disabled:opacity-60"
-                            >
-                              {opt.label}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-
-                      {/* Quick-select buttons for Welcome/Coordinator menu */}
-                      {m.content && isWelcomeMenu(m.content) && (
-                        <div className="flex flex-wrap gap-2 pt-2">
-                          <div className="w-full text-xs text-slate-400 mb-1">💡 Quick Actions:</div>
-                          {[
-                            { label: "🔮 Predict Tonight", value: "How will I sleep tonight?", color: "purple" },
-                            { label: "⏰ Optimal Bedtime", value: "What's my optimal bedtime?", color: "blue" },
-                            { label: "📊 Analyze 7 Days", value: "Analyze my last 7 days", color: "green" },
-                            { label: "💡 Sleep Tips", value: "Give me a 7-day improvement plan", color: "yellow" },
-                            { label: "📖 Bedtime Story", value: "Tell me a bedtime story", color: "pink" }
-                          ].map((opt, idx) => (
-                            <button
-                              key={idx}
-                              onClick={() => sendQuick(opt.value)}
-                              disabled={loading}
-                              className={`text-xs hover:text-white px-3 py-1.5 rounded-lg border transition-colors disabled:opacity-60 ${
-                                opt.color === 'purple' ? 'text-purple-300 bg-purple-500/10 hover:bg-purple-500/20 border-purple-400/20' :
-                                opt.color === 'blue' ? 'text-blue-300 bg-blue-500/10 hover:bg-blue-500/20 border-blue-400/20' :
-                                opt.color === 'green' ? 'text-green-300 bg-green-500/10 hover:bg-green-500/20 border-green-400/20' :
-                                opt.color === 'yellow' ? 'text-yellow-300 bg-yellow-500/10 hover:bg-yellow-500/20 border-yellow-400/20' :
-                                'text-pink-300 bg-pink-500/10 hover:bg-pink-500/20 border-pink-400/20'
-                              }`}
-                            >
-                              {opt.label}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                      
-                      {/* Audio Player for generated audio */}
-                      {m.audioId && (
-                        <AudioPlayer 
-                          audioData={{ 
-                            available: true,
-                            file_id: m.audioId, 
-                            metadata: { 
-                              estimated_duration_minutes: Math.ceil(m.content.split(' ').length / 130), // ~130 words per minute
-                              estimated_duration_seconds: Math.ceil(m.content.split(' ').length / 130) * 60,
-                              word_count: m.content.split(' ').length
-                            } 
-                          }} 
-                        />
-                      )}
-                      
-                      {/* Generate Audio Button for Storyteller */}
-                      <GenerateAudioButton message={m} messageIndex={i} setMsgs={setMsgs} />
-                      
-                      {/* Responsible AI analysis hidden per request */}
-                    </div>
-                  ) : (
-                    <div className={compactMode ? 'text-[13px] leading-[1.55] font-medium' : 'text-sm font-medium'}>{m.content}</div>
-                  )}
-                </div>
-              </div>
-            ))}
+            <MessageList
+              msgs={msgs}
+              isAssistantTyping={isAssistantTyping}
+              compactMode={compactMode}
+              sidebarCollapsed={sidebarCollapsed}
+              onQuick={(text) => sendQuick(text)}
+              setMsgs={setMsgs}
+              editingIndex={editingIndex}
+              editText={editText}
+              onEditStart={handleEditStart}
+              onEditChange={setEditText}
+              onEditCancel={handleEditCancel}
+              onEditSave={handleEditSave}
+              disableEditing={loading}
+            />
           </div>
 
           {/* Status */}
@@ -582,66 +449,25 @@ export function Chat() {
           )}
 
           {/* Input area */}
-          <div className={`${compactMode ? 'p-3' : 'p-4'} border-t border-slate-700/50 bg-slate-900/50 pb-safe`}> 
-            <div className="flex gap-3">
-              <div className="flex-1 relative">
-                <input 
-                  className={`w-full bg-slate-800/80 border border-slate-600/50 ${compactMode ? 'p-2.5 pr-10 rounded-lg text-[13px]' : 'p-3 pr-12 rounded-xl text-sm'} transition-all duration-200 focus:border-indigo-400 focus:bg-slate-800 focus:ring-2 focus:ring-indigo-400/20 focus:outline-none`} 
-                  placeholder="Ask for analysis, plan, or explanation..." 
-                  value={input} 
-                  onChange={e => setInput(e.target.value)} 
-                  onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && sendInput()}
-                  disabled={loading}
-                />
-                {input && (
-                  <button
-                    onClick={() => setInput("")}
-                    className={`absolute ${compactMode ? 'right-2' : 'right-3'} top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 transition-colors`}
-                  >
-                    ✕
-                  </button>
-                )}
-              </div>
-              <button 
-                disabled={loading || !input.trim()} 
-                onClick={sendInput} 
-                className={`bg-gradient-to-r from-indigo-600 to-cyan-600 disabled:from-slate-600 disabled:to-slate-600 disabled:cursor-not-allowed hover:from-indigo-500 hover:to-cyan-500 ${compactMode ? 'px-4 py-2 rounded-lg text-[13px]' : 'px-6 py-3 rounded-xl text-sm'} font-medium transition-all duration-200 shadow-lg hover:shadow-xl disabled:shadow-none transform hover:scale-105 disabled:scale-100 flex items-center gap-2`}
-              >
-                {loading ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                    <span className={`${compactMode ? 'text-[12px]' : ''} hidden sm:inline`}>Sending...</span>
-                  </>
-                ) : (
-                  <>
-                    <span className={compactMode ? 'text-[13px]' : ''}>Send</span>
-                    <span className={`${compactMode ? 'text-[11px]' : 'text-xs'} opacity-70`}>↵</span>
-                  </>
-                )}
-              </button>
-            </div>
-            
-            {/* Quick actions */}
-            <div className={`flex flex-wrap gap-2 ${compactMode ? 'mt-2' : 'mt-3'}`}>
-              {[
-                "Analyze my last 7 days",
-                "Make me a sleep plan", 
-                "Why is Sleep important?",
-                "Tell me about caffeine",
-                "Tell me a story to help me relax",
-                "Should I stop caffeine"
-              ].map((suggestion, i) => (
-                <button
-                  key={i}
-                  onClick={() => setInput(suggestion)}
-                  disabled={loading}
-                  className={`${compactMode ? 'text-[11px] px-2.5 py-1 rounded-md' : 'text-xs px-3 py-1 rounded-lg'} text-cyan-400 hover:text-cyan-300 bg-cyan-400/10 hover:bg-cyan-400/20 border border-cyan-400/20 transition-colors disabled:opacity-50`}
-                >
-                  {suggestion}
-                </button>
-              ))}
-            </div>
-          </div>
+          <MessageInput
+            value={input}
+            onChange={setInput}
+            onSend={sendInput}
+            loading={loading}
+            onStop={stopStreaming}
+            compactMode={compactMode}
+            suggestions={[
+              "Analyze my last 7 days",
+              "Make me a sleep plan",
+              "Why is Sleep important?",
+              "Tell me about caffeine",
+              "Explain how alcohol affects sleep",
+              "Tell me a story to help me relax",
+              "How should I stop caffeine",
+              "What’s my optimal bedtime?",
+              "Predict tonight’s sleep quality"
+            ]}
+          />
         </div>
       </div>
     </div>

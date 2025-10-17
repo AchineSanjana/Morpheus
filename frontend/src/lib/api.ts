@@ -5,50 +5,60 @@ export async function streamChat(
   message: string,
   token: string,
   onChunk: (chunk: string, responsibleAIData?: any, data?: any) => void,
-  conversationId?: string | null
+  conversationId?: string | null,
+  abortSignal?: AbortSignal
 ) {
   const api = import.meta.env.VITE_API_URL as string;
   const res = await fetch(`${api}/chat/stream`, {
     method:"POST",
     headers:{ "Content-Type":"application/json", "Authorization":`Bearer ${token}` },
-    body: JSON.stringify({ message, conversation_id: conversationId ?? undefined })
+    body: JSON.stringify({ message, conversation_id: conversationId ?? undefined }),
+    signal: abortSignal
   });
   if (!res.ok || !res.body) throw new Error("chat stream failed");
   
   const reader = res.body.getReader(); 
   const dec = new TextDecoder();
   let buffer = "";
-  
-  while (true) {
-    const { value, done } = await reader.read();
-    if (done) break;
-    
-    buffer += dec.decode(value, { stream: true });
-    
-    // Look for complete JSON objects or plain text lines in the buffer
-    let newlineIndex;
-    while ((newlineIndex = buffer.indexOf('\n')) !== -1) {
-      const raw = buffer.slice(0, newlineIndex);
-      buffer = buffer.slice(newlineIndex + 1);
-      const line = raw.trim();
-      try {
-        // Try to parse as JSON for structured responses
-        const parsed = JSON.parse(line);
-        // Build a structured meta object for responsible AI
-        const rai = (parsed && typeof parsed === 'object') ? {
-          responsibleAIChecks: parsed.responsible_ai_checks,
-          responsibleAIPassed: parsed.responsible_ai_passed,
-          responsibleAIRiskLevel: parsed.responsible_ai_risk_level,
-        } : undefined;
-        // Pass through metadata even if text is empty
-        onChunk(parsed.text || "", rai, parsed.data);
-      } catch {
-        if (line) {
-          // If not JSON, treat as plain text and preserve newline
-          onChunk(line + '\n');
+  try {
+    while (true) {
+      if (abortSignal?.aborted) {
+        throw new DOMException('Aborted', 'AbortError');
+      }
+      const { value, done } = await reader.read();
+      if (done) break;
+      
+      buffer += dec.decode(value, { stream: true });
+      
+      // Look for complete JSON objects or plain text lines in the buffer
+      let newlineIndex;
+      while ((newlineIndex = buffer.indexOf('\n')) !== -1) {
+        const raw = buffer.slice(0, newlineIndex);
+        buffer = buffer.slice(newlineIndex + 1);
+        const line = raw.trim();
+        try {
+          // Try to parse as JSON for structured responses
+          const parsed = JSON.parse(line);
+          // Build a structured meta object for responsible AI
+          const rai = (parsed && typeof parsed === 'object') ? {
+            responsibleAIChecks: parsed.responsible_ai_checks,
+            responsibleAIPassed: parsed.responsible_ai_passed,
+            responsibleAIRiskLevel: parsed.responsible_ai_risk_level,
+          } : undefined;
+          // Pass through metadata even if text is empty
+          onChunk(parsed.text || "", rai, parsed.data);
+        } catch {
+          if (line) {
+            // If not JSON, treat as plain text and preserve newline
+            onChunk(line + '\n');
+          }
         }
       }
     }
+  } catch (e: any) {
+    // Re-throw abort so caller can handle it without showing an error
+    if (e?.name === 'AbortError') throw e;
+    throw e;
   }
   
   // Handle any remaining buffer content
