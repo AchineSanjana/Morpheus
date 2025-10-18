@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase, supabaseSession } from "../lib/supabaseClient";
-import morpheusLogo from "../assets/morpheus_logo.jpg";
+import morpheusLogo from "../assets/Morpheus_Logo.jpg";
 import PrivacyPolicy from "./PrivacyPolicy";
 import TermsAndConditions from "./TermsAndConditions";
 
