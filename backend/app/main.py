@@ -34,11 +34,15 @@ app = FastAPI(title="Morpheus API")
 # Security middleware - add before CORS
 app.middleware("http")(add_security_headers)
 
-# CORS for your Vite frontend
-origins = [os.getenv("CORS_ORIGINS", "http://localhost:5173")]
+# CORS for frontend (supports comma/space separated env and optional regex for previews)
+raw_origins = os.getenv("CORS_ORIGINS", "http://localhost:5173")
+origins = [o.strip() for o in re.split(r"[,\s]+", raw_origins) if o.strip()]
+origin_regex = os.getenv("CORS_ORIGIN_REGEX" , "https://morpheus-lac.vercel.app/")  # e.g., https://.*\.vercel\.app
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
+    allow_origin_regex=origin_regex,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
