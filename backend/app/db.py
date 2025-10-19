@@ -16,21 +16,19 @@ SUPABASE_URL = os.getenv("SUPABASE_URL", "")
 SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY", "")
 SUPABASE_SERVICE_ROLE = os.getenv("SUPABASE_SERVICE_ROLE", "")
 
-# Create client only if config is present; otherwise leave as None and fail lazily
-supabase: Optional[Client] = None
-if SUPABASE_URL and (SUPABASE_ANON_KEY or SUPABASE_SERVICE_ROLE):
-    supabase = create_client(
-        SUPABASE_URL, SUPABASE_SERVICE_ROLE or SUPABASE_ANON_KEY
-    )
+if not SUPABASE_URL or not (SUPABASE_ANON_KEY or SUPABASE_SERVICE_ROLE):
+    raise RuntimeError("Missing Supabase config in .env (SUPABASE_URL / keys)")
+
+# Server uses service role if available; otherwise anon key (OK for local dev)
+supabase: Client = create_client(
+    SUPABASE_URL, SUPABASE_SERVICE_ROLE or SUPABASE_ANON_KEY
+)
 
 # ---------- Auth ----------
 
 async def get_current_user(access_token: Optional[str]):
     """Verify Supabase JWT and return the user dict, or None."""
     if not access_token:
-        return None
-    if not SUPABASE_URL or not SUPABASE_ANON_KEY:
-        # Not configured; treat as unauthenticated
         return None
     headers = {"Authorization": f"Bearer {access_token}", "apikey": SUPABASE_ANON_KEY}
     url = f"{SUPABASE_URL}/auth/v1/user"
@@ -75,8 +73,6 @@ async def insert_sleep_log(user_id: str, payload: Dict[str, Any]) -> None:
     if "wake_time" in row and isinstance(row["wake_time"], datetime):
         row["wake_time"] = _iso(row["wake_time"])
 
-    if not supabase:
-        raise RuntimeError("Supabase is not configured on the server")
     # NOTE: supabase-py is sync; calling in async is okay for a small project
     await run_in_threadpool(supabase.table(SLEEP_LOGS_TABLE).insert(row).execute)
 
@@ -86,9 +82,6 @@ async def fetch_recent_logs(user_id: str, days: int = 7) -> List[Dict[str, Any]]
     Computes a convenience 'duration_h' if bedtime & wake_time are present.
     """
     since = (datetime.utcnow() - timedelta(days=days)).date().isoformat()
-
-    if not supabase:
-        return []
 
     def _fetch():
         return supabase.table(SLEEP_LOGS_TABLE) \
