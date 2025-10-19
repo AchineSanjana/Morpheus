@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
-import morpheusLogo from "../assets/Morpheus_Logo.jpg";
+import morpheusLogo from "../assets/morpheus_logo.jpg";
 
 export default function ResetPassword() {
   const [newPassword, setNewPassword] = useState("");
