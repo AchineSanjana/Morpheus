@@ -63,7 +63,12 @@ class AudioService:
     """Text-to-speech service for storyteller with caching and multiple engines"""
     
     def __init__(self):
-        self.audio_cache_dir = Path("audio_cache")
+        # In serverless (Vercel) environments, the filesystem is read-only except /tmp
+        # Use /tmp for audio cache when Vercel is detected
+        if os.getenv("VERCEL") or os.getenv("VERCEL_REGION"):
+            self.audio_cache_dir = Path("/tmp") / "audio_cache"
+        else:
+            self.audio_cache_dir = Path("audio_cache")
         self.audio_cache_dir.mkdir(exist_ok=True)
         self.executor = ThreadPoolExecutor(max_workers=2)
         

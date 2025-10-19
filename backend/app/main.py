@@ -816,16 +816,18 @@ async def serve_audio_file(audio_id: str, request: Request):
         # Validate audio ID format (should be hash)
         if not re.match(r'^[a-f0-9]{32}$', audio_id):
             raise HTTPException(400, "Invalid audio ID format")
-        
-        # Find audio file
-        audio_file = Path(f"audio_cache/{audio_id}.mp3")
+
+        # Find audio file (use the audio service's cache directory)
+        from app.audio_service import audio_service
+        cache_dir = audio_service.audio_cache_dir
+        audio_file = cache_dir / f"{audio_id}.mp3"
         if not audio_file.exists():
             raise HTTPException(404, "Audio file not found")
-        
+
         # Security check - ensure file is in allowed directory
-        if not str(audio_file.resolve()).startswith(str(Path("audio_cache").resolve())):
+        if not str(audio_file.resolve()).startswith(str(cache_dir.resolve())):
             raise HTTPException(403, "Access denied")
-        
+
         # Serve file with appropriate headers including CORS
         return FileResponse(
             audio_file,
@@ -871,8 +873,7 @@ async def get_audio_status():
     """Get audio service status"""
     try:
         from app.audio_service import audio_service
-        
-        cache_dir = Path("audio_cache")
+        cache_dir = audio_service.audio_cache_dir
         cache_files = list(cache_dir.glob("*.mp3")) + list(cache_dir.glob("*.wav"))
         status = audio_service.get_status() if hasattr(audio_service, 'get_status') else {}
         return {
