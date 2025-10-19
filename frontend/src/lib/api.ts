@@ -1,5 +1,18 @@
 // Base URL for backend API. On Vercel, backend is exposed at /api by default.
-const API_URL: string = (import.meta.env as any).VITE_API_URL || '/api';
+function resolveApiBase(): string {
+  const envUrl = (import.meta.env as any).VITE_API_URL as string | undefined;
+  // In production, ignore localhost values and default to same-origin /api
+  if (typeof window !== 'undefined') {
+    const host = window.location.hostname;
+    const isLocalhost = host === 'localhost' || host === '127.0.0.1';
+    if (!isLocalhost) {
+      if (!envUrl || envUrl.includes('localhost')) return '/api';
+    }
+  }
+  return envUrl || '/api';
+}
+
+const API_URL: string = resolveApiBase();
 
 // Stream chat messages from the server
 /**

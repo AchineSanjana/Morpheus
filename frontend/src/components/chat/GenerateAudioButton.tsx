@@ -38,7 +38,7 @@ export function GenerateAudioButton({
         throw new Error("Please sign in to generate audio");
       }
 
-      const api = import.meta.env.VITE_API_URL as string;
+  const api = (import.meta.env as any).VITE_API_URL || '/api';
       const response = await fetch(`${api}/audio/generate`, {
         method: "POST",
         headers: {

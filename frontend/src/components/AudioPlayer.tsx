@@ -91,7 +91,7 @@ export function AudioPlayer({ audioData }: AudioPlayerProps) {
     );
   }
 
-  const API_BASE = import.meta.env.VITE_API_URL as string;
+  const API_BASE = (import.meta.env as any).VITE_API_URL || '/api';
   const audioUrl = audioData.file_id ? `${API_BASE}/audio/${audioData.file_id}` : '';
 
   return (

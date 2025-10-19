@@ -6,3 +6,4 @@ openai>=1.0.0
 pydantic
 google-generativeai
 gTTS>=2.3.0
+cryptography>=41.0.0
