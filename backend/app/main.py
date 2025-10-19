@@ -12,7 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, JSONResponse, FileResponse
 import re
 from .schemas import ChatRequest, SleepLogIn
-from .db import get_current_user, insert_sleep_log, supabase
+from .db import get_current_user, insert_sleep_log, supabase, fetch_recent_logs
 from starlette.concurrency import run_in_threadpool
 
 # NEW: import the split agents
@@ -21,7 +21,10 @@ from app.agents import AgentContext
 
 # Security imports
 from app.security_middleware import security_middleware, add_security_headers, rate_limit_error_handler
-from app.security_config import security_config
+try:
+    from app.security_config import security_config
+except Exception:
+    security_config = None  # Optional; not required for core API
 
 from typing import Optional, List
 from fastapi import Query
@@ -67,6 +70,37 @@ def health():
     """Simple health check endpoint to verify the API is up."""
     return {"ok": True, "app": "Morpheus"}
 
+@app.get("/debug/diagnostics")
+async def diagnostics():
+    """Non-sensitive diagnostics to debug runtime issues on Vercel."""
+    try:
+        from .db import supabase as sb, SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE
+    except Exception:
+        sb = None
+        SUPABASE_URL = os.getenv("SUPABASE_URL", "")
+        SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY", "")
+        SUPABASE_SERVICE_ROLE = os.getenv("SUPABASE_SERVICE_ROLE", "")
+
+    env_info = {
+        "vercel": os.getenv("VERCEL") == "1" or bool(os.getenv("VERCEL_REGION")),
+        "supabase_url_set": bool(SUPABASE_URL),
+        "supabase_key_set": bool(SUPABASE_ANON_KEY or SUPABASE_SERVICE_ROLE),
+        "cors_origins": [o for o in (os.getenv("CORS_ORIGINS", "http://localhost:5173").split(",")) if o],
+        "cors_origin_regex": os.getenv("CORS_ORIGIN_REGEX", r"https://.*\\.vercel\\.app"),
+    }
+
+    probe = {"configured": sb is not None, "ok": None, "error": None}
+    if sb is not None:
+        try:
+            r = sb.table("conversations").select("id").limit(1).execute()
+            probe["ok"] = True
+            probe["rows_seen"] = len(getattr(r, "data", []) or [])
+        except Exception as e:
+            probe["ok"] = False
+            probe["error"] = str(e)[:180]
+
+    return {"app": "Morpheus", "env": env_info, "supabase_probe": probe}
+
 @app.post("/sleep-log")
 async def upsert_sleep_log(payload: SleepLogIn, authorization: str = Header(default="")):
     """Insert or update the current user's sleep log entry.
@@ -79,6 +113,18 @@ async def upsert_sleep_log(payload: SleepLogIn, authorization: str = Header(defa
         raise HTTPException(401, "Unauthorized")
     await insert_sleep_log(user["id"], payload.dict())
     return {"ok": True}
+
+@app.get("/sleep-logs")
+async def get_sleep_logs(days: int = 7, authorization: str = Header(default="")):
+    """Fetch recent sleep logs for the authenticated user (default last 7 days)."""
+    user = await get_current_user(authorization.replace("Bearer ", ""))
+    if not user:
+        raise HTTPException(401, "Unauthorized")
+    try:
+        logs = await fetch_recent_logs(user["id"], days=max(1, min(days, 60)))
+        return {"logs": logs}
+    except Exception as e:
+        raise HTTPException(500, f"Failed to fetch logs: {str(e)}")
 
 # ---------------------- PROFILE MANAGEMENT ----------------------
 
