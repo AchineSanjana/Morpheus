@@ -6,7 +6,7 @@ import { Chat } from "./components/Chat";
 import { Account } from "./components/Account";
 import PrivacyPolicy from "./components/PrivacyPolicy";
 import TermsAndConditions from "./components/TermsAndConditions";
-import morpheusLogo from "./assets/Morpheus_Logo.jpg";
+import morpheusLogo from "./assets/morpheus_logo.jpg";
 import "./index.css";
 import { useLayout } from "./lib/LayoutContext";
 
