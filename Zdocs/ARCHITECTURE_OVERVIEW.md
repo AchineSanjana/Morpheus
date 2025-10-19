@@ -178,7 +178,7 @@ Outputs include
 
 Common production layout
 
-- Frontend: Vercel/Netlify (static build + CDN)
+- Frontend: Static hosting (e.g., Netlify or any static CDN)
 - Backend: Railway/Render/Fly.io (FastAPI + Uvicorn/Gunicorn)
 - Database/Auth/Storage: Supabase (managed Postgres + Auth + Storage)
 - Optional: Redis for distributed rate limiting and caching

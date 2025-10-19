@@ -1,4 +1,5 @@
-const API_URL = import.meta.env.VITE_API_URL;
+// Base URL for the backend API. Defaults to local dev server if env is missing.
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 // Stream chat messages from the server
 /**

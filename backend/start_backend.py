@@ -28,11 +28,12 @@ def start_backend():
         print("-" * 40)
         
         # Start the server with proper reload configuration
+        # Disable reload for stability on Windows PowerShell sessions
         uvicorn.run(
-            "app.main:app",  # Use import string for reload
+            "app.main:app",
             host="0.0.0.0",
             port=8000,
-            reload=True,
+            reload=False,
             log_level="info"
         )
         
