@@ -1,8 +1,16 @@
 fastapi
+uvicorn[standard]
 python-dotenv
 httpx
 supabase>=2
 openai>=1.0.0
+psycopg[binary]>=3.2
 pydantic
 google-generativeai
+pyttsx3>=2.90
 gTTS>=2.3.0
+mutagen>=1.47.0
+pydub>=0.25.1
+edge-tts>=6.1.10
+numpy>=1.21.0
+scikit-learn>=1.0.0
