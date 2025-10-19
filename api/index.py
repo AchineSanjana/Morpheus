@@ -18,4 +18,20 @@ if str(BACKEND_DIR) not in sys.path:
 os.environ.setdefault("VERCEL", "1")
 
 # Import the FastAPI app from the backend
-from app.main import app  # noqa: E402  (import after path tweaks)
+from app.main import app as fastapi_app  # noqa: E402  (import after path tweaks)
+
+# Some Vercel setups forward the original path (e.g. /api/chat/stream).
+# Strip the "/api" prefix if present so FastAPI routes like "/chat/stream" match.
+async def _strip_api_prefix(scope, receive, send):
+    if scope.get("type") == "http":
+        path = scope.get("path", "")
+        if path.startswith("/api/"):
+            scope = dict(scope)
+            scope["path"] = path[4:]  # remove '/api'
+        elif path == "/api":
+            scope = dict(scope)
+            scope["path"] = "/"
+    return await fastapi_app(scope, receive, send)
+
+# Export ASGI app for Vercel
+app = _strip_api_prefix

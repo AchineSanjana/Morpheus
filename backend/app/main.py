@@ -10,7 +10,6 @@ logger = logging.getLogger(__name__)
 from fastapi import FastAPI, Header, HTTPException, File, UploadFile, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, JSONResponse, FileResponse
-from pathlib import Path
 import re
 from .schemas import ChatRequest, SleepLogIn
 from .db import get_current_user, insert_sleep_log, supabase
@@ -310,8 +309,8 @@ async def upload_avatar(
     filename = f"{user_id}/{uuid.uuid4()}{file_extension}"
     
     def _upload():
-    if not supabase:
-        raise Exception("Supabase not configured")
+        if not supabase:
+            raise Exception("Supabase not configured")
         # Delete old avatar if exists
         try:
             # Get current avatar
@@ -322,23 +321,23 @@ async def upload_avatar(
                 if "/avatars/" in old_url:
                     old_filename = old_url.split("/avatars/")[-1]
                     supabase.storage.from_("avatars").remove([old_filename])
-        except:
+        except Exception:
             pass  # Ignore errors when deleting old avatar
-        
+
         # Upload new avatar
         try:
-            result = supabase.storage.from_("avatars").upload(filename, file_content)
+            supabase.storage.from_("avatars").upload(filename, file_content)
             # The upload response doesn't have an error attribute - if it fails, it raises an exception
         except Exception as upload_error:
             raise Exception(f"Upload failed: {str(upload_error)}")
-        
+
         # Get public URL
         public_url_data = supabase.storage.from_("avatars").get_public_url(filename)
         public_url = public_url_data.publicUrl if hasattr(public_url_data, 'publicUrl') else public_url_data
-        
+
         # Update profile with new avatar URL
         supabase.table("user_profile").update({"avatar_url": public_url}).eq("id", user_id).execute()
-        
+
         return public_url
     
     try:
@@ -417,80 +416,84 @@ async def chat_stream(request: Request, req: ChatRequest, authorization: str = H
     conversation_id = (req.conversation_id or "").strip() or None
 
     # Determine or create conversation id before generating so we can fetch history
-    conversation_id = (req.conversation_id or "").strip() or None
     conv_id = conversation_id
     conv_title_created: Optional[str] = None
-    if not conv_id:
-        # No conversation supplied: create a brand-new one for this user
-        conv_id = str(uuid.uuid4())
-        conv_title_created = _generate_conversation_title(text)
-
-        def _create_conversation():
-            supabase.table("conversations").insert({
-                "id": conv_id,
-                "user_id": user["id"],
-                "title": conv_title_created
-            }).execute()
-        try:
-            await run_in_threadpool(_create_conversation)
-        except Exception as e:
-            # If creation races/existed, ignore
-            logger.info(f"Conversation create ignored: {e}")
-    else:
-        # A conversation_id was provided. Ensure it exists and is owned by this user.
-        # If missing, create it. If owned by a different user, fork a new conversation for this user.
-        def _ensure_conversation():
-            try:
-                res = supabase.table("conversations").select("id,user_id").eq("id", conv_id).single().execute()
-                data = getattr(res, "data", None) or res
-            except Exception:
-                data = None
-
-            # If the conversation doesn't exist, create it with a derived title
-            if not data:
-                title = _generate_conversation_title(text)
-                supabase.table("conversations").insert({
-                    "id": conv_id,
-                    "user_id": user["id"],
-                    "title": title or "Recovered conversation"
-                }).execute()
-                return {"conv_id": conv_id, "title": title}
-
-            # If it exists but belongs to another user, create a new conversation for this user
-            if data.get("user_id") != user["id"]:
-                new_id = str(uuid.uuid4())
-                title = _generate_conversation_title(text)
-                supabase.table("conversations").insert({
-                    "id": new_id,
-                    "user_id": user["id"],
-                    "title": title or "New conversation"
-                }).execute()
-                return {"conv_id": new_id, "title": title}
-
-            # Owned by current user and exists: nothing to do
-            return {"conv_id": conv_id, "title": None}
-
-        try:
-            ensured = await run_in_threadpool(_ensure_conversation)
-            if ensured and ensured.get("conv_id") and ensured.get("conv_id") != conv_id:
-                conv_id = ensured["conv_id"]
-            if ensured and ensured.get("title"):
-                conv_title_created = ensured["title"]
-        except Exception as e:
-            # If ensure fails, fallback to a new conversation to avoid FK errors
-            logger.warning(f"Failed to ensure conversation exists/owned. Creating new. Reason: {e}")
+    if supabase:
+        if not conv_id:
+            # No conversation supplied: create a brand-new one for this user
             conv_id = str(uuid.uuid4())
             conv_title_created = _generate_conversation_title(text)
-            def _create_fallback():
+
+            def _create_conversation():
                 supabase.table("conversations").insert({
                     "id": conv_id,
                     "user_id": user["id"],
                     "title": conv_title_created
                 }).execute()
             try:
-                await run_in_threadpool(_create_fallback)
-            except Exception as ce:
-                logger.info(f"Conversation fallback create ignored: {ce}")
+                await run_in_threadpool(_create_conversation)
+            except Exception as e:
+                # If creation races/existed, ignore
+                logger.info(f"Conversation create ignored: {e}")
+        else:
+            # A conversation_id was provided. Ensure it exists and is owned by this user.
+            # If missing, create it. If owned by a different user, fork a new conversation for this user.
+            def _ensure_conversation():
+                try:
+                    res = supabase.table("conversations").select("id,user_id").eq("id", conv_id).single().execute()
+                    data = getattr(res, "data", None) or res
+                except Exception:
+                    data = None
+
+                # If the conversation doesn't exist, create it with a derived title
+                if not data:
+                    title = _generate_conversation_title(text)
+                    supabase.table("conversations").insert({
+                        "id": conv_id,
+                        "user_id": user["id"],
+                        "title": title or "Recovered conversation"
+                    }).execute()
+                    return {"conv_id": conv_id, "title": title}
+
+                # If it exists but belongs to another user, create a new conversation for this user
+                if data.get("user_id") != user["id"]:
+                    new_id = str(uuid.uuid4())
+                    title = _generate_conversation_title(text)
+                    supabase.table("conversations").insert({
+                        "id": new_id,
+                        "user_id": user["id"],
+                        "title": title or "New conversation"
+                    }).execute()
+                    return {"conv_id": new_id, "title": title}
+
+                # Owned by current user and exists: nothing to do
+                return {"conv_id": conv_id, "title": None}
+
+            try:
+                ensured = await run_in_threadpool(_ensure_conversation)
+                if ensured and ensured.get("conv_id") and ensured.get("conv_id") != conv_id:
+                    conv_id = ensured["conv_id"]
+                if ensured and ensured.get("title"):
+                    conv_title_created = ensured["title"]
+            except Exception as e:
+                # If ensure fails, fallback to a new conversation to avoid FK errors
+                logger.warning(f"Failed to ensure conversation exists/owned. Creating new. Reason: {e}")
+                conv_id = str(uuid.uuid4())
+                conv_title_created = _generate_conversation_title(text)
+                def _create_fallback():
+                    supabase.table("conversations").insert({
+                        "id": conv_id,
+                        "user_id": user["id"],
+                        "title": conv_title_created
+                    }).execute()
+                try:
+                    await run_in_threadpool(_create_fallback)
+                except Exception as ce:
+                    logger.info(f"Conversation fallback create ignored: {ce}")
+    else:
+        # Supabase not configured: use ephemeral conversation id for UI continuity
+        if not conv_id:
+            conv_id = str(uuid.uuid4())
 
     # Fetch recent history for this conversation
     history: List[dict] = []
@@ -773,6 +776,8 @@ async def rename_conversation(conversation_id: str, payload: dict, authorization
         raise HTTPException(400, "Title required")
 
     def _rename():
+        if not supabase:
+            raise Exception("Supabase not configured")
         supabase.table("conversations").update({"title": new_title}).eq("id", conversation_id).eq("user_id", user["id"]).execute()
     await run_in_threadpool(_rename)
     return {"ok": True}
@@ -789,6 +794,8 @@ async def list_messages(
         raise HTTPException(401, "Unauthorized")
 
     def _fetch():
+        if not supabase:
+            return type("X", (), {"data": []})()
         q = supabase.table("messages").select("*").eq("user_id", user["id"])
         if before:
             q = q.lt("created_at", before)
@@ -810,6 +817,8 @@ async def clear_messages(authorization: str = Header(default="")):
         raise HTTPException(401, "Unauthorized")
     
     def _delete():
+        if not supabase:
+            return
         supabase.table("messages").delete().eq("user_id", user["id"]).execute()
 
     await run_in_threadpool(_delete)
