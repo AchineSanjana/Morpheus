@@ -37,7 +37,7 @@ app.middleware("http")(add_security_headers)
 # CORS for frontend (supports comma/space separated env and optional regex for previews)
 raw_origins = os.getenv("CORS_ORIGINS", "http://localhost:5173")
 origins = [o.strip() for o in re.split(r"[,\s]+", raw_origins) if o.strip()]
-origin_regex = os.getenv("CORS_ORIGIN_REGEX" , "https://morpheus-lac.vercel.app/")  # e.g., https://.*\.vercel\.app
+origin_regex = os.getenv("CORS_ORIGIN_REGEX" , r"https://.*\.vercel\.app")  # allow all vercel.app subdomains by default
 
 app.add_middleware(
     CORSMiddleware,
@@ -95,6 +95,8 @@ async def get_profile(user_id: str, authorization: str = Header(default="")):
         raise HTTPException(401, "Unauthorized")
     
     def _fetch_or_create():
+        if not supabase:
+            raise Exception("Database is not configured")
         """Threadpool task: get profile or create a minimal fallback."""
         print(f"Attempting to fetch profile for user_id: {user_id}")
         try:
@@ -164,6 +166,8 @@ async def update_profile(user_id: str, updates: dict, authorization: str = Heade
         raise HTTPException(400, "No valid fields to update")
     
     def _update():
+        if not supabase:
+            raise Exception("Database is not configured")
         """Threadpool task: apply partial profile updates (whitelisted)."""
         result = supabase.table("user_profile").update(filtered_updates).eq("id", user_id).execute()
         return result.data[0] if result.data else None
@@ -182,6 +186,8 @@ async def create_profile(user_id: str, authorization: str = Header(default="")):
         raise HTTPException(401, "Unauthorized")
     
     def _create():
+        if not supabase:
+            raise Exception("Database is not configured")
         """Threadpool task: create profile if missing; otherwise return existing."""
         # Check if profile already exists
         try:
@@ -220,6 +226,8 @@ async def check_table(authorization: str = Header(default="")):
         raise HTTPException(401, "Unauthorized")
     
     def _check():
+        if not supabase:
+            return {"table_exists": False, "error": "Supabase not configured"}
         """Threadpool task: attempt a minimal select on user_profile."""
         try:
             # Try to select from user_profile table
@@ -242,6 +250,8 @@ async def profile_stats(authorization: str = Header(default="")):
         raise HTTPException(401, "Unauthorized")
     
     def _get_stats():
+        if not supabase:
+            return {"error": "Supabase not configured"}
         try:
             # Count total auth users
             auth_count_result = supabase.rpc('count_auth_users').execute()
@@ -300,6 +310,8 @@ async def upload_avatar(
     filename = f"{user_id}/{uuid.uuid4()}{file_extension}"
     
     def _upload():
+    if not supabase:
+        raise Exception("Supabase not configured")
         # Delete old avatar if exists
         try:
             # Get current avatar
@@ -483,6 +495,8 @@ async def chat_stream(request: Request, req: ChatRequest, authorization: str = H
     # Fetch recent history for this conversation
     history: List[dict] = []
     def _fetch_history():
+        if not supabase:
+            return type("X", (), {"data": []})()
         return supabase.table("messages").select("role,agent,content,created_at").eq("conversation_id", conv_id).eq("user_id", user["id"]).order("created_at", desc=False).limit(50).execute()
     try:
         hres = await run_in_threadpool(_fetch_history)
@@ -525,7 +539,8 @@ async def chat_stream(request: Request, req: ChatRequest, authorization: str = H
         })
 
         def _insert_messages():
-            supabase.table("messages").insert(messages_to_insert).execute()
+                if supabase:
+                    supabase.table("messages").insert(messages_to_insert).execute()
         await run_in_threadpool(_insert_messages)
         logger.info(f"Successfully persisted messages for conversation_id: {conv_id}")
     except Exception as e:
@@ -564,6 +579,8 @@ async def list_conversations(authorization: str = Header(default="")):
         raise HTTPException(401, "Unauthorized")
 
     def _fetch():
+        if not supabase:
+            return type("X", (), {"data": []})()
         return supabase.table("conversations").select("id,title,created_at,updated_at").eq("user_id", user["id"]).order("updated_at", desc=True).execute()
 
     res = await run_in_threadpool(_fetch)
@@ -581,11 +598,11 @@ async def recover_conversations(authorization: str = Header(default="")):
 
     def _recover():
         # 1. Find all distinct conversation_ids from messages for the current user
+        if not supabase:
+            return {"recovered": 0, "details": "Supabase not configured"}
         msg_convos_res = supabase.rpc('get_distinct_conversation_ids_for_user', {"p_user_id": user["id"]}).execute()
-        
         if not msg_convos_res.data:
             return {"recovered": 0, "details": "No message history found."}
-            
         message_convo_ids = {item['conversation_id'] for item in msg_convos_res.data}
 
         # 2. Find all existing conversation_ids from the conversations table for the user
@@ -634,6 +651,8 @@ async def get_conversation(conversation_id: str, authorization: str = Header(def
     def _fetch():
         # Verify ownership; if conversation row is missing but messages exist,
         # recover gracefully by creating a placeholder conversation.
+        if not supabase:
+            return {"data": []}
         try:
             conv = supabase.table("conversations").select("id").eq("id", conversation_id).eq("user_id", user["id"]).single().execute()
         except Exception:
@@ -670,6 +689,8 @@ async def get_conversation(conversation_id: str, authorization: str = Header(def
             raise Exception("not found")
 
         # Conversation exists and is owned by user; fetch messages
+        if not supabase:
+            return {"data": []}
         msgs = supabase.table("messages").select("id,role,agent,content,created_at").eq("conversation_id", conversation_id).order("created_at", desc=False).execute()
         return msgs
 
@@ -693,6 +714,8 @@ async def delete_conversation(conversation_id: str, authorization: str = Header(
 
     def _delete():
         # Verify ownership first
+        if not supabase:
+            raise HTTPException(404, "Conversation not found")
         conv = supabase.table("conversations").select("id,user_id").eq("id", conversation_id).eq("user_id", user["id"]).single().execute()
         if not getattr(conv, "data", None):
             raise HTTPException(404, "Conversation not found")
@@ -716,6 +739,8 @@ async def debug_conversation_state(authorization: str = Header(default="")):
 
     def _inspect():
         # Conversations for user
+        if not supabase:
+            return {"conversations": [], "message_counts": {}}
         conv_res = supabase.table("conversations").select("id,title,created_at,updated_at").eq("user_id", user["id"]).order("updated_at", desc=True).execute()
         conversations = conv_res.data or []
 
