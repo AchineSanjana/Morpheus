@@ -1,5 +1,4 @@
-// Base URL for backend API. On Vercel, backend is exposed at /api by default.
-const API_URL: string = (import.meta.env as any).VITE_API_URL || '/api';
+const API_URL = import.meta.env.VITE_API_URL;
 
 // Stream chat messages from the server
 /**
@@ -13,7 +12,8 @@ export async function streamChat(
   conversationId?: string | null,
   abortSignal?: AbortSignal
 ) {
-  const res = await fetch(`${API_URL}/chat/stream`, {
+  const api = import.meta.env.VITE_API_URL as string;
+  const res = await fetch(`${api}/chat/stream`, {
     method:"POST",
     headers:{ "Content-Type":"application/json", "Authorization":`Bearer ${token}` },
     body: JSON.stringify({ message, conversation_id: conversationId ?? undefined }),
@@ -106,7 +106,8 @@ export type SleepLogPayload = {
 
 /** Save/append a sleep log entry for the authenticated user. */
 export async function saveSleepLog(payload: SleepLogPayload, token: string) {
-  const res = await fetch(`${API_URL}/sleep-log`, {
+  const api = import.meta.env.VITE_API_URL as string;
+  const res = await fetch(`${api}/sleep-log`, {
     method:"POST",
     headers:{ "Content-Type":"application/json", "Authorization":`Bearer ${token}` },
     body: JSON.stringify(payload)
@@ -125,7 +126,8 @@ export type SleepLog = SleepLogPayload & {
 
 /** Fetch recent sleep logs (default 7 days). */
 export async function fetchRecentSleepLogs(token: string, days = 7): Promise<SleepLog[]> {
-  const res = await fetch(`${API_URL}/sleep-logs?days=${days}`, {
+  const api = import.meta.env.VITE_API_URL as string;
+  const res = await fetch(`${api}/sleep-logs?days=${days}`, {
     headers: { Authorization: `Bearer ${token}` }
   });
   if (!res.ok) {
@@ -145,11 +147,12 @@ type Message = {
 
 /** Fetch historical chat messages with optional pagination. */
 export async function fetchMessages(token: string, opts?: { limit?: number; before?: string; after?: string }) {
+  const api = import.meta.env.VITE_API_URL as string;
   const params = new URLSearchParams();
   if (opts?.limit) params.set("limit", String(opts.limit));
   if (opts?.before) params.set("before", opts.before);
   if (opts?.after) params.set("after", opts.after);
-  const res = await fetch(`${API_URL}/messages?${params.toString()}`, {
+  const res = await fetch(`${api}/messages?${params.toString()}`, {
     headers: { Authorization: `Bearer ${token}` }
   });
   if (!res.ok) {
@@ -164,7 +167,8 @@ export type Conversation = { id: string; title: string; created_at: string; upda
 
 /** List recent conversations for the authenticated user. */
 export async function listConversations(token: string): Promise<Conversation[]> {
-  const res = await fetch(`${API_URL}/conversations`, {
+  const api = import.meta.env.VITE_API_URL as string;
+  const res = await fetch(`${api}/conversations`, {
     headers: { Authorization: `Bearer ${token}` }
   });
   if (!res.ok) {
@@ -177,7 +181,8 @@ export async function listConversations(token: string): Promise<Conversation[]> 
 
 /** Get all messages for a conversation (role, agent, content). */
 export async function getConversationMessages(token: string, conversationId: string) {
-  const res = await fetch(`${API_URL}/conversations/${conversationId}`, {
+  const api = import.meta.env.VITE_API_URL as string;
+  const res = await fetch(`${api}/conversations/${conversationId}`, {
     headers: { Authorization: `Bearer ${token}` }
   });
   if (!res.ok) {
@@ -189,7 +194,8 @@ export async function getConversationMessages(token: string, conversationId: str
 
 /** Rename a conversation title. */
 export async function renameConversation(token: string, conversationId: string, title: string) {
-  const res = await fetch(`${API_URL}/conversations/${conversationId}`, {
+  const api = import.meta.env.VITE_API_URL as string;
+  const res = await fetch(`${api}/conversations/${conversationId}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify({ title })
@@ -240,7 +246,8 @@ export type ProfileData = {
 /** Fetch a user's profile or return null if not found. */
 export async function fetchProfile(userId: string, token: string): Promise<ProfileData | null> {
   try {
-    const res = await fetch(`${API_URL}/profile/${userId}`, {
+    const api = import.meta.env.VITE_API_URL as string;
+    const res = await fetch(`${api}/profile/${userId}`, {
       headers: { Authorization: `Bearer ${token}` }
     });
     if (!res.ok) {
@@ -257,7 +264,8 @@ export async function fetchProfile(userId: string, token: string): Promise<Profi
 
 /** Update profile fields for the authenticated user. */
 export async function updateProfile(userId: string, updates: Partial<ProfileData>, token: string): Promise<ProfileData> {
-  const res = await fetch(`${API_URL}/profile/${userId}`, {
+  const api = import.meta.env.VITE_API_URL as string;
+  const res = await fetch(`${api}/profile/${userId}`, {
     method: "PUT",
     headers: { 
       "Content-Type": "application/json",
@@ -288,7 +296,8 @@ export async function uploadAvatar(file: File, userId: string, token: string): P
   const formData = new FormData();
   formData.append("avatar", file);
   
-  const res = await fetch(`${API_URL}/profile/${userId}/avatar`, {
+  const api = import.meta.env.VITE_API_URL as string;
+  const res = await fetch(`${api}/profile/${userId}/avatar`, {
     method: "POST",
     headers: { Authorization: `Bearer ${token}` },
     body: formData
