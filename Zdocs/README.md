@@ -1,6 +1,6 @@
 # Zdocs Index
 
-Last Updated: October 17, 2025
+Last Updated: October 21, 2025
 
 This folder contains internal documentation for the Morpheus project. Canonical entry points:
 
@@ -9,7 +9,6 @@ This folder contains internal documentation for the Morpheus project. Canonical 
 - Security
   - Comprehensive: `SECURITY_DOCUMENTATION.md`
   - Quick reference: `SECURITY_QUICK_REFERENCE.md`
-  - Index: `SECURITY.md`
 - Responsible AI: `RESPONSIBLE_AI_IMPLEMENTATION.md`
 - Agent roles & communication: `AGENT_ROLES_COMMUNICATION.md`
 
