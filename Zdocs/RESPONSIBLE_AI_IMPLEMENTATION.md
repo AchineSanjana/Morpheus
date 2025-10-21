@@ -1,6 +1,6 @@
 # Responsible AI Implementation - Morpheus Sleep AI Assistant
 
-Last Updated: October 17, 2025
+Last Updated: October 21, 2025
 
 Related: See `ARCHITECTURE_OVERVIEW.md` (system context) and `SECURITY_DOCUMENTATION.md` (privacy/safety controls). The frontend includes a Privacy Policy modal (`PrivacyPolicy.tsx`) that surfaces Responsible AI disclosures.
 
@@ -47,6 +47,8 @@ This document outlines the comprehensive responsible AI implementation in the Mo
 #### 3. Agent-Specific Enhancements
 - **Coach Agent**: Enhanced with inclusive coaching principles and cultural sensitivity
 - **Analyst Agent**: Transparent data analysis with clear methodology disclosure
+- **Prediction Agent**: Predictive analysis with confidence scores and uncertainty acknowledgment
+- **Storyteller Agent**: Comprehensive input/output validation for child-safe content
 - **All Agents**: Updated to provide action type classification for appropriate transparency
 
 #### 4. API Endpoints (`app/main.py`)
@@ -96,6 +98,104 @@ This document outlines the comprehensive responsible AI implementation in the Mo
 - **Medical Details**: Identification of sensitive medical information
 - **Location Data**: Protection of geographical information
 - **Financial Info**: Securing financial data references
+
+## Agent-Specific Responsible AI Features
+
+### Prediction Agent
+The Prediction Agent incorporates responsible AI principles specific to predictive analytics:
+
+**Transparency in Predictions**
+- **Confidence Scoring**: All predictions include confidence percentages (typically 70-90% based on data quality)
+- **Factor Explanation**: Clear breakdown of positive, negative, and neutral factors affecting predictions
+- **Uncertainty Acknowledgment**: Explicitly states when predictions have lower confidence due to limited data
+- **Methodology Disclosure**: Explains the algorithm uses weighted scoring of lifestyle factors and historical patterns
+
+**Fairness in Forecasting**
+- **Individualized Models**: Does not apply population-level assumptions without personal data validation
+- **Age-Neutral Baselines**: Avoids age-based stereotyping in baseline recommendations
+- **Accessibility Considerations**: Provides alternative optimization strategies for varying abilities
+- **Cultural Sensitivity**: Respects different sleep schedules and cultural practices
+
+**Ethical Data Usage**
+- **Data Minimization**: Only uses sleep-relevant data for predictions (caffeine, exercise, stress, screen time)
+- **Historical Privacy**: Limits historical data lookback to 30 days for predictions
+- **No External Data**: Does not incorporate third-party data or external tracking
+- **User Control**: Users can see exactly what data contributed to each prediction
+
+**Example Prediction Response with Transparency**
+```python
+{
+    "predicted_quality": "Good",
+    "quality_score": 7.5,
+    "confidence": 75,
+    "key_factors": {
+        "positive": ["No caffeine after 3pm", "Exercised today", "Consistent bedtime"],
+        "negative": ["High stress level", "2 hours screen time before bed"],
+        "neutral": ["Moderate alcohol consumption"]
+    },
+    "methodology": "Prediction based on weighted analysis of lifestyle factors and your 30-day sleep history",
+    "uncertainty_note": "Confidence is moderate due to recent sleep pattern variability",
+    "recommendations": ["Consider reducing screen time 1 hour before bed", "Try relaxation exercises to manage stress"]
+}
+```
+
+### Storyteller Agent
+The Storyteller Agent implements comprehensive safety and responsible AI controls:
+
+**Child Safety First**
+- **Input Sanitization**: Removes all prompt injection attempts, code execution patterns, and malicious input
+- **Output Validation**: Blocks any AI-generated content containing violence, scary themes, or age-inappropriate material
+- **PII Protection**: Filters out any personal information (emails, addresses, phone numbers) from stories
+- **Medical Content Blocking**: Prevents generation of health advice or medical information in stories
+
+**Content Safety Validation**
+```python
+# Blocked content patterns
+UNSAFE_PATTERNS = {
+    "violence": ["fight", "hurt", "blood", "weapon", "attack"],
+    "scary": ["scary", "frightening", "nightmare", "terror", "horror"],
+    "inappropriate": ["adult themes", "inappropriate relationships"],
+    "medical": ["diagnosis", "treatment", "medicine", "cure", "disease"],
+    "commercial": ["buy now", "subscribe", "premium", "advertisement"]
+}
+
+# Every generated story validated against these patterns
+if any(pattern in story.lower() for category in UNSAFE_PATTERNS.values() for pattern in category):
+    # Reject and use pre-validated fallback story
+    story = select_fallback_story()
+```
+
+**Transparency in Story Generation**
+- **Generation Method Disclosure**: Clearly indicates whether story is "AI-generated" or "fallback" (pre-validated)
+- **Security Validation Status**: Response includes confirmation that input was sanitized and output was validated
+- **Content Metadata**: Provides word count, reading time, and safety validation status
+- **Theme Attribution**: Discloses which theme and elements were used in generation
+
+**Fallback Safety System**
+- **Pre-Validated Stories**: 5+ hand-crafted, professionally-reviewed bedtime stories as fallbacks
+- **Zero AI Risk**: Fallback stories contain no AI-generated content, ensuring absolute safety
+- **Variety Tracking**: System avoids repeating fallback stories using history tracking
+- **Seamless Integration**: Users receive high-quality stories even when AI generation fails validation
+
+**User Name Protection**
+```python
+# Sanitization of user names in stories
+def sanitize_user_name(name: str) -> str:
+    # Remove special characters, limit length
+    sanitized = re.sub(r'[^a-zA-Z\s-]', '', name)[:50]
+    
+    # Block names that could be exploits
+    if any(pattern in sanitized.lower() for pattern in UNSAFE_NAME_PATTERNS):
+        return None  # Don't include name in story
+    
+    return sanitized
+```
+
+**Audio Generation Safety**
+- **Optional Only**: Audio never generated automatically, only on explicit user request via button
+- **Content Revalidation**: Text is revalidated before audio generation
+- **Cache Security**: Audio files stored with content hashing to prevent tampering
+- **Metadata Transparency**: Users informed of audio capability and estimated duration
 
 ## User Experience Features
 
@@ -184,6 +284,6 @@ This implementation serves as a model for responsible AI in healthcare applicati
 
 ---
 
-*Last Updated: September 24, 2025*
+*Last Updated: October 21, 2025*
 *Version: 1.0.0*
 *Contact: For questions about this implementation, please contact the development team*

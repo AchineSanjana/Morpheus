@@ -1,6 +1,6 @@
 # Morpheus Sleep AI Assistant - System Architecture
 
-Last Updated: October 17, 2025
+Last Updated: October 21, 2025
 
 Note: This document complements `ARCHITECTURE_OVERVIEW.md` with deeper tier-by-tier details, diagrams, and example snippets. Treat `ARCHITECTURE_OVERVIEW.md` as the canonical starting point.
 
@@ -79,14 +79,14 @@ The Morpheus Sleep AI Assistant is a comprehensive, scalable platform designed t
 │  │  │ • Plans     │  │ • Insights        │  │ • Research  │  │ • Tracking  │  │  │
 │  │  └─────────────┘  └───────────────────┘  └─────────────┘  └─────────────┘  │  │
 │  │                                                                             │  │
-│  │  ┌─────────────┐                              ┌─────────────┐              │  │
-│  │  │  Addiction  │                              │   Future    │              │  │
-│  │  │    Agent    │                              │   Agents    │              │  │
-│  │  │             │                              │             │              │  │
-│  │  │ • Behavioral│                              │ • Medical   │              │  │
-│  │  │ • Support   │                              │ • Therapy   │              │  │
-│  │  │ • Recovery  │                              │ • Community │              │  │
-│  │  └─────────────┘                              └─────────────┘              │  │
+│  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐      │  │
+│  │  │  Addiction  │  │ Prediction  │  │ Storyteller │  │   Future    │      │  │
+│  │  │    Agent    │  │    Agent    │  │    Agent    │  │   Agents    │      │  │
+│  │  │             │  │             │  │             │  │             │      │  │
+│  │  │ • Behavioral│  │ • Quality   │  │ • Bedtime   │  │ • Medical   │      │  │
+│  │  │ • Support   │  │ • Forecasts │  │ • Stories   │  │ • Therapy   │      │  │
+│  │  │ • Recovery  │  │ • Optimize  │  │ • Audio Gen │  │ • Community │      │  │
+│  │  └─────────────┘  └─────────────┘  └─────────────┘  └─────────────┘      │  │
 │  └─────────────────────────────────────────────────────────────────────────────┘  │
 │                                         │                                         │
 └─────────────────────────────────────────┼─────────────────────────────────────────┘
@@ -197,6 +197,10 @@ app/
 ├── schemas.py                 # Data validation models
 ├── db.py                      # Database operations
 ├── responsible_ai.py          # AI ethics middleware
+├── audio_service.py           # Audio generation service
+├── llm_gemini.py              # Gemini AI integration
+├── security_config.py         # Security configuration
+├── security_middleware.py     # Security middleware
 └── agents/
     ├── __init__.py           # Base agent architecture
     ├── coordinator.py        # Request routing
@@ -204,7 +208,9 @@ app/
     ├── analyst.py            # Data analysis
     ├── information.py        # Knowledge base
     ├── nutrition.py          # Lifestyle advice
-    └── addiction.py          # Behavioral support
+    ├── addiction.py          # Behavioral support
+    ├── prediction.py         # Sleep prediction & forecasting
+    └── storyteller.py        # Bedtime storytelling
 ```
 
 **Scalability Features:**
@@ -234,7 +240,9 @@ class CoordinatorAgent(BaseAgent):
             'coach': CoachAgent(),
             'information': InformationAgent(),
             'nutrition': NutritionAgent(),
-            'addiction': AddictionAgent()
+            'addiction': AddictionAgent(),
+            'prediction': SleepPredictionAgent(),
+            'storyteller': StoryTellerAgent()
         }
     
     async def _handle_core(self, message: str, ctx: AgentContext) -> AgentResponse:

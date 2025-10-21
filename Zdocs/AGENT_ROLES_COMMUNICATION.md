@@ -1,6 +1,6 @@
 # Morpheus Sleep AI Assistant - Agent Roles & Communication Flow
 
-Last Updated: October 17, 2025
+Last Updated: October 21, 2025
 
 Agents present in codebase: coordinator, coach, analyst, information, nutrition, addiction, storyteller, prediction. See `ARCHITECTURE_OVERVIEW.md` for system context.
 
@@ -44,14 +44,14 @@ The Morpheus Sleep AI Assistant employs a sophisticated multi-agent architecture
 │  │  │ Coach       │  │ Specialist  │  │ & Educator  │  │ & Tracker   │      │ │
 │  │  └─────────────┘  └─────────────┘  └─────────────┘  └─────────────┘      │ │
 │  │                                                                             │ │
-│  │  ┌─────────────┐                              ┌─────────────┐              │ │
-│  │  │  Addiction  │                              │   Future    │              │ │
-│  │  │    Agent    │                              │   Agents    │              │ │
-│  │  │             │                              │             │              │ │
-│  │  │ Behavioral  │                              │ • Medical   │              │ │
-│  │  │ Change      │                              │ • Therapy   │              │ │
-│  │  │ Specialist  │                              │ • Community │              │ │
-│  │  └─────────────┘                              └─────────────┘              │ │
+│  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐      │ │
+│  │  │  Addiction  │  │ Prediction  │  │ Storyteller │  │   Future    │      │ │
+│  │  │    Agent    │  │    Agent    │  │    Agent    │  │   Agents    │      │ │
+│  │  │             │  │             │  │             │  │             │      │ │
+│  │  │ Behavioral  │  │ Sleep       │  │ Bedtime     │  │ • Medical   │      │ │
+│  │  │ Change      │  │ Forecasting │  │ Stories &   │  │ • Therapy   │      │ │
+│  │  │ Specialist  │  │ & Optimize  │  │ Audio Gen   │  │ • Community │      │ │
+│  │  └─────────────┘  └─────────────┘  └─────────────┘  └─────────────┘      │ │
 │  └─────────────────────────────────────────────────────────────────────────────┘ │
 │                                                                                 │
 └─────────────────────────────────────────────────────────────────────────────────┘
@@ -81,7 +81,9 @@ class CoordinatorAgent(BaseAgent):
             "coach": ["plan", "tips", "improve", "advice", "coach", "help"],
             "information": ["what is", "explain", "tell me about", "define"],
             "nutrition": ["caffeine", "alcohol", "diet", "food", "eating", "exercise"],
-            "addiction": ["quit", "craving", "dependence", "addicted", "stop"]
+            "addiction": ["quit", "craving", "dependence", "addicted", "stop"],
+            "prediction": ["predict", "tonight", "tomorrow", "forecast", "bedtime", "optimal"],
+            "storyteller": ["story", "tale", "bedtime", "read me"]
         }
     
     async def _detect_intent(self, message: str) -> str:
@@ -491,11 +493,346 @@ async def assess_intervention_level(self, message: str, severity: str) -> Interv
     """
 ```
 
-### 7. Storyteller Agent - Safe Bedtime Content
+### 7. Prediction Agent - The Sleep Forecasting Specialist
 
-The Storyteller Agent generates bedtime stories with strict safety filters:
-- Input sanitization to block prompt injection and unsafe patterns
-- Output validation to remove age-inappropriate or medical/PII content
+#### Primary Role
+The Prediction Agent provides AI-powered sleep quality forecasting and optimization recommendations based on daily activities, lifestyle factors, and historical sleep patterns.
+
+#### Core Capabilities
+
+**Sleep Quality Prediction**
+```python
+class SleepPredictionAgent(BaseAgent):
+    name = "prediction"
+    
+    def __init__(self):
+        super().__init__()
+        self.action_type = "predictive_analysis"  # For responsible AI transparency
+        
+        # Prediction model weights
+        self.prediction_models = {
+            "sleep_quality": {
+                "weights": {
+                    "caffeine_after3pm": -1.2,
+                    "alcohol": -0.8,
+                    "screen_time": -0.01,  # per minute
+                    "stress_level": -0.3,  # per point on 1-10 scale
+                    "exercise_today": 0.5,
+                    "consistency_bonus": 1.0,
+                    "weekend_penalty": -0.3
+                },
+                "baseline": 7.0
+            },
+            "duration": {
+                "weights": {
+                    "caffeine_after3pm": -0.3,
+                    "alcohol": -0.5,
+                    "screen_time": -0.005,
+                    "stress_level": -0.1,
+                    "exercise_today": 0.2,
+                    "age_factor": -0.02
+                },
+                "baseline": 7.5
+            }
+        }
+    
+    async def predict_sleep_quality(self, user_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Predicts tonight's sleep quality (1-10 scale) based on:
+        - Today's caffeine and alcohol consumption
+        - Screen time before bed
+        - Stress levels
+        - Exercise activity
+        - Historical sleep consistency
+        """
+```
+
+**Optimal Bedtime Recommendations**
+- **Circadian Rhythm Analysis**: Considers natural sleep-wake patterns
+- **Sleep Debt Calculation**: Accounts for accumulated sleep deficit
+- **Personal Schedule Integration**: Adapts to target wake times
+- **Consistency Optimization**: Promotes regular sleep schedules
+- **Timeline Generation**: Provides step-by-step preparation schedule
+
+**Predictive Features**
+```python
+async def optimal_bedtime_recommendation(self, user_id: str, target_wake_time: str = "07:00") -> Dict:
+    """
+    Generates personalized bedtime recommendations including:
+    - Optimal bedtime window for target wake time
+    - Sleep preparation timeline (dinner, screen cutoff, wind-down, lights out)
+    - Confidence score based on historical adherence
+    - Alternative bedtimes if primary recommendation is impractical
+    """
+```
+
+**AI-Enhanced Explanations**
+- **Natural Language Insights**: Uses Gemini AI to explain predictions in user-friendly terms
+- **Contextual Recommendations**: Provides actionable tips based on prediction factors
+- **Encouraging Tone**: Maintains positive, motivational messaging
+- **Scientific Grounding**: Balances accessibility with evidence-based reasoning
+
+#### Communication Protocols
+
+**Input Data Requirements**
+```python
+# User data for predictions
+{
+    "caffeine_after3pm": bool,
+    "alcohol": bool,
+    "screen_time_minutes": int,
+    "stress_level": int (1-10),
+    "exercise_today": bool,
+    "recent_consistency": float (0-1),
+    "age": int,
+    "avg_duration": float,
+    "recent_bedtimes": List[str]
+}
+```
+
+**Prediction Response Format**
+```python
+{
+    "agent": "prediction",
+    "text": "AI-generated explanation of prediction",
+    "data": {
+        "prediction_type": "sleep_quality|optimal_bedtime",
+        "predicted_quality": "Good|Fair|Poor",
+        "quality_score": float (1-10),
+        "predicted_duration": float (hours),
+        "confidence": int (percentage),
+        "key_factors": {
+            "positive": List[str],  # Factors improving sleep
+            "negative": List[str],  # Factors hindering sleep
+            "neutral": List[str]    # Neutral factors
+        },
+        "recommendations": List[str],  # Actionable tips
+        "optimal_bedtime": "HH:MM",    # If bedtime prediction
+        "preparation_timeline": List[Dict],  # Step-by-step schedule
+        "factors_analysis": str  # Detailed factor explanation
+    }
+}
+```
+
+**Integration with Other Agents**
+- **Analytics Agent**: Receives historical pattern analysis for better predictions
+- **Coach Agent**: Predictions inform coaching strategies and interventions
+- **Nutrition Agent**: Lifestyle factors feed into prediction models
+- **Coordinator**: Routes prediction requests based on keyword detection
+
+### 8. Storyteller Agent - The Bedtime Story Creator
+
+#### Primary Role
+The Storyteller Agent generates calming, age-appropriate bedtime stories with comprehensive security validation and optional audio narration capabilities.
+
+#### Core Capabilities
+
+**Secure Story Generation**
+```python
+class StoryTellerAgent(BaseAgent):
+    name = "storyteller"
+    
+    def __init__(self):
+        super().__init__()
+        self.action_type = "storytelling"  # For responsible AI context
+        self.security_validator = SecurityValidator()
+        self.audio_enabled = True
+        self.recent_story_hashes = []  # Track recent stories to avoid repetition
+        
+    # Story themes with pre-validated elements
+    STORY_THEMES = {
+        "space": {
+            "elements": ["stars", "planets", "moon", "galaxy", "cosmos"],
+            "characters": ["astronaut", "friendly alien", "space explorer"],
+            "settings": ["space station", "moon base", "starship"]
+        },
+        "nature": {
+            "elements": ["forest", "meadow", "stream", "wildlife"],
+            "characters": ["woodland creatures", "gentle animals"],
+            "settings": ["peaceful forest", "flower garden", "quiet pond"]
+        },
+        # ... additional themes
+    }
+```
+
+**Multi-Layered Security**
+- **Input Sanitization**: Removes prompt injection patterns, SQL injection attempts, and malicious code
+- **Output Validation**: Checks generated stories for age-inappropriate content, medical information, and PII
+- **Fallback Stories**: Pre-validated safe stories used when AI generation fails or produces invalid content
+- **Content Hashing**: Tracks recent stories to minimize repetition
+- **User Name Protection**: Sanitizes and validates any user names included in stories
+
+**Story Customization**
+```python
+# User preferences extraction
+preferences = {
+    "theme": "space|nature|ocean|fantasy|adventure",  # Pre-defined safe themes
+    "length": "short|medium|long|extended",  # 120-2000 words
+    "custom_topic": str,  # Sanitized custom topic (optional)
+    "include_name": bool,  # Include user's name in story
+    "mood": "calm"  # Always calm for bedtime
+}
+
+# Length options
+STORY_LENGTHS = {
+    "short": {"words": "120-180", "description": "A brief, gentle tale"},
+    "medium": {"words": "800-1200", "description": "A comfortable bedtime story"},
+    "long": {"words": "1200-1500", "description": "A longer, more detailed story"},
+    "extended": {"words": "1500-2000", "description": "An immersive bedtime journey"}
+}
+```
+
+**AI-Generated Content with Safety**
+```python
+async def _handle_core(self, message: str, ctx: Optional[AgentContext] = None) -> AgentResponse:
+    # Step 1: Sanitize all user input
+    sanitized_message = self.security_validator.sanitize_user_input(message)
+    
+    # Step 2: Extract preferences from sanitized input
+    preferences = self._extract_story_preferences(sanitized_message, ctx)
+    
+    # Step 3: Build secure prompt with variation token for uniqueness
+    prompt = self._build_enhanced_prompt(preferences, user_name, variation_token)
+    
+    # Step 4: Generate story with AI (with retry logic)
+    for attempt in range(2):
+        candidate_story = await generate_gemini_text(prompt)
+        
+        # Validate output for safety and appropriateness
+        if self.security_validator.validate_story_output(candidate_story):
+            # Check against recent stories to avoid repeats
+            if not self._is_duplicate(candidate_story):
+                story_text = candidate_story
+                break
+    
+    # Step 5: Use fallback if AI generation fails
+    if not story_text:
+        story_text = self._select_fallback_story()
+```
+
+**Audio Generation Integration**
+- **Optional Audio**: Users can request audio narration via button click (not automatic)
+- **Audio Service**: Integrates with `audio_service.py` for text-to-speech generation
+- **Caching**: Audio files cached for efficient delivery
+- **Metadata**: Provides audio duration estimates and availability status
+
+#### Communication Protocols
+
+**Story Request Flow**
+```
+User Message → Input Sanitization → Preference Extraction → 
+Prompt Building → AI Generation → Output Validation → 
+Fallback (if needed) → Response Formatting → Audio Metadata Addition
+```
+
+**Response Format**
+```python
+{
+    "agent": "storyteller",
+    "text": "Story content (always provided as text first)",
+    "data": {
+        "preferences": {
+            "theme": str,
+            "length": str,
+            "has_custom_topic": bool,
+            "name_requested": bool
+        },
+        "generation_method": "ai_generated|fallback",
+        "story_metadata": {
+            "word_count": int,
+            "character_count": int,
+            "estimated_reading_time": str,
+            "security_validated": bool,
+            "content_hash": str  # For logging, not exposed to user
+        },
+        "audio_capability": {
+            "available": bool,
+            "can_generate": bool,
+            "story_suitable_for_audio": bool,
+            "estimated_audio_duration": str
+        },
+        "security_info": {
+            "input_sanitized": bool,
+            "output_validated": bool,
+            "user_name_sanitized": bool,
+            "prompt_secured": bool
+        }
+    }
+}
+```
+
+**Security Validation Patterns**
+```python
+# Input sanitization removes:
+- Prompt injection attempts ("ignore previous instructions", "system:", etc.)
+- SQL injection patterns
+- JavaScript code
+- Python code execution attempts
+- Special characters and excessive length
+
+# Output validation blocks:
+- Medical advice or health information
+- Personal identifying information (emails, phone numbers, addresses)
+- Age-inappropriate content (violence, scary themes, adult topics)
+- Commercial or promotional content
+- Real names of public figures
+```
+
+#### Integration Points
+- **Audio Service**: Optional audio generation on user request
+- **Coordinator**: Routes storytelling requests based on keywords like "story", "tale", "bedtime"
+- **Responsible AI**: All stories pass through fairness and transparency checks
+- **Security Middleware**: Additional layer of content validation
+
+### 9. Future Agents (Planned)
+
+The following agents are planned for future implementation:
+
+**Medical Integration Agent**
+- Professional medical record integration
+- Sleep disorder screening
+- Specialist referral management
+- Medication interaction tracking
+
+**Therapy Agent**
+- CBT-I protocol implementation
+- Progress tracking and homework
+- Therapeutic intervention scheduling
+- Mental health integration
+
+**Community Agent**
+- Peer support connections
+- Group challenges and accountability
+- Success story sharing
+- Anonymous support forums
+
+## Agent Communication Best Practices
+
+### 1. Context Preservation
+- Maintain conversation state across agent transitions
+- Pass relevant historical data between agents
+- Preserve user preferences and settings
+
+### 2. Graceful Degradation
+- Provide fallback responses when primary agent unavailable
+- Route to secondary agents when primary agent confidence is low
+- Use general responses when specialized knowledge not required
+
+### 3. Responsible AI Integration
+- All agent responses automatically validated
+- Transparent explanation of AI decision-making
+- User data protection at every stage
+- Bias detection and mitigation
+
+### 4. Performance Optimization
+- Cache frequently requested analysis results
+- Parallelize independent agent operations
+- Implement smart request routing
+- Monitor and optimize response times
+
+## Conclusion
+
+The Morpheus multi-agent architecture provides a sophisticated, scalable, and responsible approach to AI-powered sleep coaching. Each specialized agent contributes unique expertise while maintaining seamless coordination through the Coordinator Agent. The system prioritizes user safety, data privacy, and ethical AI practices at every level of communication.
 - Token/length limits and calm tone guidance
 - Pre-approved fallback stories when validation fails or LLM is unavailable
 
