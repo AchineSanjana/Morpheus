@@ -2,7 +2,7 @@
 echo 🚀 Starting Morpheus Sleep AI - Backend Server
 echo ===============================================
 
-cd /d "C:\Users\admin\Desktop\sliit_work\Y3S1_DS\IRWA\Sleep improvemnt ai\Morpheus\backend"
+cd /d "D:\GitHub\Morpheus\backend"
 
 echo 📁 Current directory: %CD%
 echo 🐍 Starting Python backend server...
