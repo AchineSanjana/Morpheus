@@ -89,6 +89,10 @@ audio_cache/
 *.mp3
 *.wav
 
+# Batch files (startup scripts)
+start_backend.bat
+start_frontend.bat
+
 # Temporary debug files
 *debug_*.py
 *demo_*.py
@@ -176,5 +180,3 @@ dist-*/
 Thumbs.db
 ehthumbs.db
 
-start_backend.bat
-start_frontend.bat
