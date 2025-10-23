@@ -2,7 +2,7 @@
 echo 🚀 Starting Morpheus Sleep AI Frontend
 echo ========================================
 
-cd /d "C:\Users\admin\Desktop\sliit_work\Y3S1_DS\IRWA\Sleep improvemnt ai\Morpheus\frontend"
+cd /d "C:\Users\sanjana\Projects\Morpheus\frontend"
 
 echo 📁 Current directory: %CD%
 echo 📦 Checking if node_modules exists...
