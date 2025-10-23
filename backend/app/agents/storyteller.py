@@ -5,10 +5,12 @@ import re
 import hashlib
 from datetime import datetime
 
+# Importing base classes and utilities from project modules
 from . import BaseAgent, AgentContext, AgentResponse
 from app.llm_gemini import generate_gemini_text, gemini_ready
 from app.audio_service import audio_service
 
+# Initialize general and security-specific loggers
 logger = logging.getLogger(__name__)
 security_logger = logging.getLogger("security")
 
@@ -38,6 +40,7 @@ class SecurityValidator:
             r"window\.",
         ]
         
+        # Replace risky patterns with a filtered tag
         sanitized = text
         for pattern in dangerous_patterns:
             sanitized = re.sub(pattern, "[FILTERED]", sanitized, flags=re.IGNORECASE)
@@ -72,6 +75,7 @@ class SecurityValidator:
         content_lower = content.lower()
         for pattern in harmful_patterns:
             if re.search(pattern, content_lower):
+                # Log unsafe content and block it
                 security_logger.warning(f"Story content failed safety check: {pattern}")
                 return False
         
