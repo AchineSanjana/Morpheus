@@ -33,30 +33,44 @@ SAFETY_PATTERNS = {
     ]
 }
 
+
 class CoachAgent(BaseAgent):
     """
-    Advanced sleep coaching agent with personalized plans, progressive difficulty,
-    habit tracking, and comprehensive CBT-I inspired techniques.
+    Advanced sleep coaching agent for Morpheus Sleep AI.
+    
+    Functionality:
+    - Generates personalized sleep improvement plans using CBT-I and other frameworks.
+    - Tracks user habits and progress, adapting recommendations over time.
+    - Detects urgent medical or safety concerns in user input and responds with disclaimers.
+    - Applies responsible AI principles for inclusivity, transparency, and safety.
+    
+    Key attributes:
+    - name: Agent identifier ('coach')
+    - action_type: Used for responsible AI logging and transparency
+    - coaching_frameworks: Supported sleep improvement methodologies
+    - inclusive_coaching_principles: Ensures advice is accessible and culturally sensitive
     """
     name = "coach"
 
     def __init__(self):
         super().__init__()
-        self.action_type = "sleep_coaching_plan"  # For responsible AI transparency
+        self.action_type = "sleep_coaching_plan"  # Used for responsible AI transparency
+        # Supported coaching frameworks for sleep improvement
         self.coaching_frameworks = {
             "cbt_i": "Cognitive Behavioral Therapy for Insomnia",
             "sleep_hygiene": "Sleep Environment & Habits Optimization",
             "circadian": "Circadian Rhythm Regulation",
             "stress_management": "Stress & Anxiety Reduction for Sleep"
         }
-        
-        # Responsible AI configurations
+        # Responsible AI: inclusive coaching principles
         self.inclusive_coaching_principles = {
             "cultural_sensitivity": "Adapt recommendations to different cultural sleep practices",
             "accessibility": "Provide alternatives for users with different abilities",
             "economic_inclusivity": "Offer free and low-cost solutions alongside premium options",
             "age_inclusivity": "Tailor advice for different age groups without stereotyping"
         }
+
+    # ...existing code...
 
     async def _analyze_sleep_patterns(self, logs: List[Dict[str, Any]]) -> Dict[str, Any]:
         """Deep analysis of sleep patterns with trends and insights."""

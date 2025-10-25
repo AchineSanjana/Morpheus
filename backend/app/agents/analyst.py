@@ -20,16 +20,28 @@ def _avg(nums: List[float]) -> Optional[float]:
     """Safe average calculation."""
     return round(mean(nums), 1) if nums else None
 
+
 class AnalyticsAgent(BaseAgent):
     """
-    Enhanced analytics agent that provides comprehensive sleep pattern analysis
-    with trends, insights, and actionable recommendations.
+    Analytics agent for Morpheus Sleep AI.
+    
+    Functionality:
+    - Analyzes user sleep logs to extract patterns, trends, and actionable insights.
+    - Calculates averages, trends (improving/worsening/stable), and consistency ratings.
+    - Provides recommendations based on detected sleep issues and progress.
+    - Ensures responsible AI transparency by logging analysis actions.
+    
+    Key attributes:
+    - name: Agent identifier ('analytics')
+    - action_type: Used for responsible AI logging and transparency
     """
     name = "analytics"
-    
+
     def __init__(self):
         super().__init__()
-        self.action_type = "data_analysis"  # For responsible AI transparency
+        self.action_type = "data_analysis"  # Used for responsible AI transparency
+
+    # ...existing code...
 
     def _calculate_trend(self, values: List[float]) -> str:
         """Calculate if values are improving, worsening, or stable."""
