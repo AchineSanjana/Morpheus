@@ -4,6 +4,7 @@ from . import BaseAgent, AgentContext, AgentResponse
 from app.db import fetch_recent_logs
 from app.llm_gemini import generate_gemini_text
 
+# Disclaimer added to every AI response for transparency and safety
 DISCLAIMER = (
     "_This is general wellness guidance, not medical advice. "
     "For ongoing sleep or health concerns, consult a qualified clinician._"
@@ -18,11 +19,13 @@ class NutritionAgent(BaseAgent):
     
     def __init__(self):
         super().__init__()
+        # Defines what kind of action this agent performs (for explainability)
         self.action_type = "personalized_recommendation"  # For responsible AI transparency
 
     async def _handle_core(self, message: str, ctx: Optional[AgentContext] = None) -> AgentResponse:
-        ctx = ctx or {}
+        ctx = ctx or {} # Context may contain user data and recent logs
         user = ctx.get("user")
+        # Require user authentication to access personal logs
         if not user:
             return {"agent": self.name, "text": "Please sign in first so I can review your logs."}
 
@@ -37,6 +40,7 @@ class NutritionAgent(BaseAgent):
         alcohol_days = sum(1 for r in logs if r.get("alcohol"))
         high_screen_days = sum(1 for r in logs if (r.get("screen_time_min", 0) or 0) > 60)
 
+        # Create a summary of key behavior patterns
         summary: Dict[str, Any] = {
             "days": total_days,
             "caffeine_after3pm_days": caffeine_days,
