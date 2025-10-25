@@ -5,10 +5,12 @@ import re
 import hashlib
 from datetime import datetime
 
+# Importing base classes and utilities from project modules
 from . import BaseAgent, AgentContext, AgentResponse
 from app.llm_gemini import generate_gemini_text, gemini_ready
 from app.audio_service import audio_service
 
+# Initialize general and security-specific loggers
 logger = logging.getLogger(__name__)
 security_logger = logging.getLogger("security")
 
@@ -38,6 +40,7 @@ class SecurityValidator:
             r"window\.",
         ]
         
+        # Replace risky patterns with a filtered tag
         sanitized = text
         for pattern in dangerous_patterns:
             sanitized = re.sub(pattern, "[FILTERED]", sanitized, flags=re.IGNORECASE)
@@ -72,6 +75,7 @@ class SecurityValidator:
         content_lower = content.lower()
         for pattern in harmful_patterns:
             if re.search(pattern, content_lower):
+                # Log unsafe content and block it
                 security_logger.warning(f"Story content failed safety check: {pattern}")
                 return False
         
@@ -122,6 +126,7 @@ STORY_THEMES = {
     }
 }
 
+# Preset story length configurations
 STORY_LENGTHS = {
     "short": {"words": "120-180", "description": "A brief, gentle tale"},
     "medium": {"words": "800-1200", "description": "A comfortable bedtime story"},
@@ -129,6 +134,7 @@ STORY_LENGTHS = {
     "extended": {"words": "1500-2000", "description": "An immersive, detailed bedtime journey"}
 }
 
+# Base tone for all generated stories
 SYSTEM_STYLE_BASE = (
     "You are a gentle bedtime storyteller who creates peaceful, calming stories. "
     "Write in simple, flowing language that soothes and relaxes. "
@@ -185,6 +191,7 @@ FALLBACK_STORIES = [
 ]
 
 class StoryTellerAgent(BaseAgent):
+    """Main agent responsible for generating safe, calming bedtime stories"""
     name = "storyteller"
 
     def __init__(self):
@@ -193,7 +200,7 @@ class StoryTellerAgent(BaseAgent):
         self.story_preferences = {}  # Track user preferences (encrypted)
         self.story_history = []  # Track recent stories for variety
         self.recent_story_hashes: List[str] = []  # Track hashes of recent AI stories to avoid repeats
-        self.security_validator = SecurityValidator()
+        self.security_validator = SecurityValidator() # Security utility instance
         self.audio_enabled = True  # Enable audio features
 
     def _extract_story_preferences(self, message: str, ctx: Optional[AgentContext] = None) -> Dict[str, Any]:
@@ -201,6 +208,7 @@ class StoryTellerAgent(BaseAgent):
         # Sanitize input first
         sanitized_message = self.security_validator.sanitize_user_input(message)
         
+         # Default preferences setup
         preferences = {
             "theme": None,
             "length": "medium",  # Now defaults to ~1000 words
@@ -216,6 +224,7 @@ class StoryTellerAgent(BaseAgent):
             if theme in message_lower or any(element in message_lower for element in STORY_THEMES[theme]["elements"]):
                 preferences["theme"] = theme
                 break
+        # Random fallback theme if none detected
         if not preferences["theme"]:
             preferences["theme"] = random.choice(list(STORY_THEMES.keys()))
         
@@ -250,6 +259,7 @@ class StoryTellerAgent(BaseAgent):
         """Build an enhanced prompt based on user preferences with security checks"""
         length_info = STORY_LENGTHS[preferences["length"]]
 
+        # Begin constructing the AI prompt
         prompt = f"{SYSTEM_STYLE_BASE}\n\n"
         prompt += f"Write a {preferences['length']} bedtime story ({length_info['words']} words). "
 
@@ -272,11 +282,12 @@ class StoryTellerAgent(BaseAgent):
         if preferences["custom_topic"]:
             prompt += f"The story should be about: {preferences['custom_topic']}. "
 
-        # Add name instruction (sanitized name)
+        # Sanitize and include the user name softly if allowed
         sanitized_name = self.security_validator.sanitize_user_name(user_name) if user_name else None
         if preferences["include_name"] and sanitized_name:
             prompt += f"The listener's name is {sanitized_name}. Include their name gently in the story. "
 
+        # Add safe storytelling instructions
         prompt += "\nRemember: Keep the tone peaceful and sleep-inducing. "
         prompt += "Use sensory details that promote relaxation. "
         prompt += "End with a gentle conclusion that encourages rest and peaceful dreams. "
@@ -303,14 +314,14 @@ class StoryTellerAgent(BaseAgent):
         story_index = FALLBACK_STORIES.index(selected_story)
         self.story_history.append(story_index)
         
-        # Keep history manageable
+        # Keep only recent history
         if len(self.story_history) > 5:
             self.story_history = self.story_history[-3:]
         
         return selected_story
 
     def _get_data_sources(self, ctx: AgentContext) -> List[str]:
-        """Override to specify storytelling data sources"""
+        """Defines what data sources this agent uses for storytelling"""
         sources = ["ai_generated_content", "creative_writing"]
         if ctx.get("user"):
             sources.append("user_preferences")
@@ -325,7 +336,7 @@ class StoryTellerAgent(BaseAgent):
             # Sanitize input message first
             sanitized_message = self.security_validator.sanitize_user_input(message)
             
-            # Log security event (without exposing content)
+            # Log request securely using hashed data
             user_id = user.get('id', 'anonymous')[:8] if user.get('id') else 'anonymous'
             security_logger.info(f"Story request - User: {user_id}, "
                                f"Hash: {self.security_validator.hash_for_logging(sanitized_message)}")
@@ -345,7 +356,7 @@ class StoryTellerAgent(BaseAgent):
             variation_token = hashlib.sha256(var_seed.encode()).hexdigest()[:8]
             prompt = self._build_enhanced_prompt(preferences, user_name, variation_token)
             
-            # Try to generate story with AI
+            # Try to generate story if AI model is ready
             story_text = ""
             generation_method = "fallback"
             
@@ -390,7 +401,7 @@ class StoryTellerAgent(BaseAgent):
             
             # Always provide text story first - audio is now optional via button
             # No automatic audio generation - user can request it via "Generate Audio" button
-            
+            # Prepare structured response data for frontend
             # Prepare response data with security metadata and audio capability info
             response_data = {
                 "preferences": {
@@ -429,6 +440,7 @@ class StoryTellerAgent(BaseAgent):
                 if len(self.recent_story_hashes) > 5:
                     self.recent_story_hashes = self.recent_story_hashes[-5:]
 
+            # Return final structured response
             return {
                 "agent": self.name,
                 "text": story_text,
