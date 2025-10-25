@@ -180,3 +180,5 @@ dist-*/
 Thumbs.db
 ehthumbs.db
 
+start_backend.bat
+start_frontend.bat
