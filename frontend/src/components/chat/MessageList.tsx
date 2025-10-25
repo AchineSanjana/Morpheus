@@ -259,19 +259,19 @@ export function MessageList({
                   <div className="flex flex-wrap gap-2 pt-2">
                     <div className="w-full text-xs text-slate-400 mb-1">💡 Quick Actions:</div>
                     {[
-                      { label: "🔮 Predict Tonight", value: "How will I sleep tonight?", color: "purple" },
-                      { label: "⏰ Optimal Bedtime", value: "What's my optimal bedtime?", color: "blue" },
-                      { label: "📊 Analyze 7 Days", value: "Analyze my last 7 days", color: "green" },
-                      { label: "💡 Sleep Tips", value: "Give me a 7-day improvement plan", color: "yellow" },
-                      { label: "📖 Bedtime Story", value: "Tell me a bedtime story", color: "pink" },
+                      { label: " Predict Tonight", value: "How will I sleep tonight?", color: "purple" },
+                      { label: " Optimal Bedtime", value: "What's my optimal bedtime?", color: "blue" },
+                      { label: " Analyze 7 Days", value: "Analyze my last 7 days", color: "green" },
+                      { label: " Sleep Tips", value: "Give me a 7-day improvement plan", color: "yellow" },
+                      { label: " Bedtime Story", value: "Tell me a bedtime story", color: "pink" },
                       // Information agent
-                      { label: "ℹ️ Caffeine Info", value: "Explain how caffeine affects sleep", color: "blue" },
+                      { label: "ℹ Caffeine Info", value: "Explain how caffeine affects sleep", color: "blue" },
                       // Nutrition (personalized from logs)
-                      { label: "🥗 From My Logs: Caffeine", value: "Based on my logs, when should I have my last coffee?", color: "green" },
-                      { label: "📵 Reduce Screens Plan", value: "Based on my logs, help me reduce screen time before bed", color: "yellow" },
+                      { label: " From My Logs: Caffeine", value: "Based on my logs, when should I have my last coffee?", color: "green" },
+                      { label: " Reduce Screens Plan", value: "Based on my logs, help me reduce screen time before bed", color: "yellow" },
                       // Addiction agent
-                      { label: "🚫 Quit Alcohol Help", value: "I'm addicted to alcohol; help me make a safe reduction plan", color: "purple" },
-                      { label: "🚬 Quit Nicotine Help", value: "I'm addicted to nicotine; help me quit", color: "pink" },
+                      { label: " Quit Alcohol Help", value: "I'm addicted to alcohol; help me make a safe reduction plan", color: "purple" },
+                      { label: " Quit Caffeine", value: "I'm addicted to caffeine; help me quit", color: "pink" },
                     ].map((opt, idx) => (
                       <button
                         key={idx}
