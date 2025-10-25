@@ -146,16 +146,16 @@ class AnalyticsAgent(BaseAgent):
 
         # Lifestyle factor analysis
         caffeine_nights = sum(1 for log in logs if log.get("caffeine_after3pm"))
-        alchohol_nights = sum(1 for log in logs if log.get("alchohol"))
+        alcohol_nights = sum(1 for log in logs if log.get("alcohol"))
         high_screen_nights = sum(1 for log in logs if log.get("screen_time_min", 0) > 60)
 
         if caffeine_nights > len(logs) * 0.5:
             insights["concerns"].append(f"Frequent late caffeine ({caffeine_nights}/{len(logs)} nights)")
             insights["recommendations"].append("Avoid caffeine after 2pm for better sleep onset")
 
-        if alchohol_nights > len(logs) * 0.3:
-            insights["notable_patterns"].append(f"Alchohol consumption on {alchohol_nights}/{len(logs)} nights")
-            insights["recommendations"].append("Consider alchohol's impact on sleep quality; avoid alchohol 3–4 hours before bed")
+        if alcohol_nights > len(logs) * 0.3:
+            insights["notable_patterns"].append(f"Alcohol consumption on {alcohol_nights}/{len(logs)} nights")
+            insights["recommendations"].append("Consider alcohol's impact on sleep quality; avoid alcohol 3–4 hours before bed")
 
         if high_screen_nights > len(logs) * 0.4:
             insights["concerns"].append(f"Excessive screen time ({high_screen_nights}/{len(logs)} nights >60min)")
@@ -290,8 +290,8 @@ class AnalyticsAgent(BaseAgent):
         waketimes = [_to_dt(r.get("wake_time")) for r in logs if _to_dt(r.get("wake_time"))]
 
 
-        # Lifestyle factors (explicitly compute alchohol and caffeine series)
-        alchohol_flags = [bool(r.get("alchohol")) for r in logs]
+        # Lifestyle factors (explicitly compute alcohol and caffeine series)
+        alcohol_flags = [bool(r.get("alcohol")) for r in logs]
         caffeine_flags = [bool(r.get("caffeine_after3pm")) for r in logs]
 
         # Calculate core metrics
@@ -340,11 +340,11 @@ class AnalyticsAgent(BaseAgent):
 
 
 
-        # Alchohol & Caffeine summary
-        alchohol_nights = sum(1 for f in alchohol_flags if f)
+        # Alcohol & Caffeine summary
+        alcohol_nights = sum(1 for f in alcohol_flags if f)
         caffeine_nights = sum(1 for f in caffeine_flags if f)
-        report_parts.append("\n**🍷 Alchohol & ☕ Caffeine:**\n")
-        report_parts.append(f"• Alchohol nights: {alchohol_nights}/{len(logs)}\n")
+        report_parts.append("\n**🍷 Alcohol & ☕ Caffeine:**\n")
+        report_parts.append(f"• Alcohol nights: {alcohol_nights}/{len(logs)}\n")
         report_parts.append(f"• Caffeine nights: {caffeine_nights}/{len(logs)}\n")
 
         # Optional correlation snapshots
@@ -358,20 +358,20 @@ class AnalyticsAgent(BaseAgent):
 
 
         if len(logs) >= 3:
-            # Alchohol correlation
-            dur_on_alc = _avg_on(alchohol_flags, [r.get("duration_h") for r in logs])
-            dur_off_alc = _avg_on([not f for f in alchohol_flags], [r.get("duration_h") for r in logs])
-            awk_on_alc = _avg_on_int(alchohol_flags, [int(r.get("awakenings", 0)) for r in logs])
-            awk_off_alc = _avg_on_int([not f for f in alchohol_flags], [int(r.get("awakenings", 0)) for r in logs])
+            # Alcohol correlation
+            dur_on_alc = _avg_on(alcohol_flags, [r.get("duration_h") for r in logs])
+            dur_off_alc = _avg_on([not f for f in alcohol_flags], [r.get("duration_h") for r in logs])
+            awk_on_alc = _avg_on_int(alcohol_flags, [int(r.get("awakenings", 0)) for r in logs])
+            awk_off_alc = _avg_on_int([not f for f in alcohol_flags], [int(r.get("awakenings", 0)) for r in logs])
             alc_corr_lines = []
             if dur_on_alc is not None and dur_off_alc is not None:
                 diff = round(dur_on_alc - dur_off_alc, 2)
                 direction = "longer" if diff > 0 else "shorter"
-                alc_corr_lines.append(f"On alchohol nights, sleep tends to be {abs(diff)}h {direction}.")
+                alc_corr_lines.append(f"On alcohol nights, sleep tends to be {abs(diff)}h {direction}.")
             if awk_on_alc is not None and awk_off_alc is not None:
                 diff = round(awk_on_alc - awk_off_alc, 2)
                 direction = "more" if diff > 0 else "fewer"
-                alc_corr_lines.append(f"On alchohol nights, there are {abs(diff)} {direction} awakenings.")
+                alc_corr_lines.append(f"On alcohol nights, there are {abs(diff)} {direction} awakenings.")
             if alc_corr_lines:
                 report_parts.append("\n**Alcohol correlation:**\n" + "\n".join(f"• {l}" for l in alc_corr_lines) + "\n")
 
@@ -445,7 +445,7 @@ class AnalyticsAgent(BaseAgent):
             "bedtime_consistency": bedtime_consistency,
             "waketime_consistency": waketime_consistency,
             "insights": insights,
-            "alchohol_nights": alchohol_nights,
+            "alcohol_nights": alcohol_nights,
             "caffeine_nights": caffeine_nights,
             "trends": trend_analysis
         }
